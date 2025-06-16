@@ -1,6 +1,6 @@
 <template>
   <div>
-    <div v-if="!keypair">
+    <!-- <div v-if="!keypair">
       <div v-if="hasSavedKeypair">
         <h2>You have a saved keypair</h2>
         <div>
@@ -10,11 +10,22 @@
       <div>
         <button @click="generateKeypair">Generate new keypair</button>
       </div>
+      <div v-if="localWallet.installed">
+        <button @click="localWallet.connect()">Connect to local wallet</button>
+      </div>
+    </div> -->
+    <div>{{ wallet }}</div>
+    <div v-if="!publicKey">
+      <button @click="selectWallet('Local')">Connect to local wallet</button>
+      <button @click="selectWallet('Phantom')">
+        Connect to phantom wallet
+      </button>
+      <button @click="connect">Connect</button>
     </div>
 
-    <div v-if="keypair">
-      <button @click="generateKeypair">Generate new keypair</button>
-      <div>Public key: {{ keypair.publicKey.toBase58() }}</div>
+    <div v-if="publicKey">
+      <!-- <button @click="generateKeypair">Generate new keypair</button> -->
+      <div>Public key: {{ wallet.publicKey }}</div>
       <!-- {{ myAccountInfo }} -->
       <div v-if="myAccountInfo.isRegistered">
         Balance: {{ solana.balance_sol(myAccountInfo.accountInfo) }} SOL | (-{{
@@ -75,8 +86,19 @@
   </div>
 </template>
 <script setup lang="ts">
-  // import { Stem } from "~/utils/stem";
-  import { Keypair, PublicKey } from "@solana/web3.js";
+  import { useLocalWallet } from "./composables/localWallet";
+  import { usePhantomWallet } from "./composables/phantomWallet";
+
+  import { useWallet } from "./composables/wallet";
+
+  const { wallet, names, selectWallet } = useWallet([
+    useLocalWallet(),
+    usePhantomWallet(),
+  ]);
+
+  // console.log(wallet.value);
+
+  import { PublicKey } from "@solana/web3.js";
   import {
     getAccountInfo,
     getRawSolana,
@@ -84,76 +106,49 @@
     getChatData,
   } from "./composables/stem";
   import { Stem, PeerState } from "./utils/stem";
-  import { ref, computed } from "vue";
+  import { ref, computed, unref } from "vue";
   import PubKey from "./components/PubKey.vue";
   import Chat from "./components/chat.vue";
 
   const solana = getRawSolana();
 
-  const keypair = ref<Keypair | null>(null);
-  const publicKey = computed(() => keypair.value?.publicKey || null);
+  const publicKey = computed(() => wallet.value?.publicKey || null);
   const myAccountInfo = getAccountInfo(publicKey);
 
-  // let stem = null;
-
-  const _data = localStorage.getItem("keypair");
-  const hasSavedKeypair = ref<boolean>(!!_data);
-
-  const loadKeypair = () => {
-    const _data = localStorage.getItem("keypair");
-    if (_data) {
-      console.log("Key found. Loading from local storage.");
-      const parsedData = JSON.parse(_data);
-
-      keypair.value = Keypair.fromSecretKey(
-        Uint8Array.from(Buffer.from(parsedData.secretKey, "base64"))
-      );
-      console.log("Key loaded from local storage.");
-      // initialized.value = true;
-    }
-  };
-
-  const generateKeypair = () => {
-    keypair.value = Keypair.generate();
-    const savedData = {
-      secretKey: Buffer.from(keypair.value.secretKey).toString("base64"),
-      publicKey: keypair.value.publicKey.toBase58(),
-    };
-    console.log(savedData);
-    localStorage.setItem("keypair", JSON.stringify(savedData));
-    console.log("Key saved to local storage.");
-  };
-
-  const requestAirdrop = () => {
+  const requestAirdrop = async () => {
     console.log("Requesting airdrop");
     if (publicKey.value) {
-      solana.requestAirdrop(publicKey.value);
+      await solana.requestAirdrop(publicKey.value);
     }
+  };
+
+  const connect = () => {
+    wallet.value.connect();
   };
 
   const walletDescriptor = getWalletDescriptor(publicKey);
 
   const register = () => {
-    if (keypair.value) {
-      Stem.register(solana.connection, keypair.value);
+    if (wallet.value.publicKey) {
+      Stem.register(unref(wallet));
     }
   };
 
   const invitee = ref<string>("");
   const invite = () => {
     const inviteePubkey = new PublicKey(invitee.value);
-    if (keypair.value && inviteePubkey) {
-      Stem.invite(solana.connection, keypair.value, inviteePubkey);
+    if (wallet.value.publicKey && inviteePubkey) {
+      Stem.invite(wallet.value, inviteePubkey);
     }
   };
   const rejectPeer = (peer: PublicKey) => {
-    if (keypair.value && peer) {
-      Stem.reject(solana.connection, keypair.value, peer);
+    if (wallet.value.publicKey && peer) {
+      Stem.reject(wallet.value, peer);
     }
   };
   const acceptPeer = (peer: PublicKey) => {
-    if (keypair.value && peer) {
-      Stem.accept(solana.connection, keypair.value, peer);
+    if (wallet.value.publicKey && peer) {
+      Stem.accept(wallet.value, peer);
     }
   };
 
@@ -168,13 +163,8 @@
 
   const message = ref<string>("");
   const sendMessage = async () => {
-    if (keypair.value && chatPeer.value) {
-      await Stem.sendMessage(
-        solana.connection,
-        keypair.value,
-        chatPeer.value,
-        message.value
-      );
+    if (wallet.value.publicKey && chatPeer.value) {
+      await Stem.sendMessage(wallet.value, chatPeer.value, message.value);
       message.value = "";
     }
   };

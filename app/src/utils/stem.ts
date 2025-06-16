@@ -1,6 +1,5 @@
 import {
   PublicKey,
-  Keypair,
   Connection,
   LAMPORTS_PER_SOL,
   type AccountInfo,
@@ -148,8 +147,8 @@ export const PeerState = {
 };
 
 export const Stem = {
-  async register(connection: Connection, keypair: Keypair) {
-    const descriptorPda = StemHelpers.getDescriptorPda(keypair.publicKey);
+  async register(wallet: any) {
+    const descriptorPda = StemHelpers.getDescriptorPda(wallet.publicKey);
 
     if (!descriptorPda) {
       throw new Error("Descriptor PDA not generated");
@@ -164,7 +163,7 @@ export const Stem = {
           isWritable: true,
         },
         {
-          pubkey: keypair.publicKey,
+          pubkey: wallet.publicKey,
           isSigner: true,
           isWritable: false,
         },
@@ -178,7 +177,7 @@ export const Stem = {
     });
     console.log(ix);
     const tx = new Transaction().add(ix);
-    await connection.sendTransaction(tx, [keypair]);
+    await wallet.signTransaction(tx);
     console.log("✅ PDA инициализирована");
   },
   deserializeDescriptor: (data: Buffer) => {
@@ -199,8 +198,8 @@ export const Stem = {
     });
     return chat;
   },
-  async invite(connection: Connection, keypair: Keypair, invitee: PublicKey) {
-    const inviterPda = StemHelpers.getDescriptorPda(keypair.publicKey);
+  async invite(wallet: any, invitee: PublicKey) {
+    const inviterPda = StemHelpers.getDescriptorPda(wallet.publicKey);
     const inviteePda = StemHelpers.getDescriptorPda(invitee);
 
     if (!inviterPda || !inviteePda) {
@@ -211,7 +210,7 @@ export const Stem = {
       programId: PROGRAM_ID,
       keys: [
         {
-          pubkey: keypair.publicKey,
+          pubkey: wallet.publicKey,
           isSigner: true,
           isWritable: false,
         },
@@ -240,12 +239,12 @@ export const Stem = {
     });
 
     const tx = new Transaction().add(ix);
-    const signature = await connection.sendTransaction(tx, [keypair]);
+    const signature = await wallet.signTransaction(tx);
     console.log("✅ Invite sent");
     return signature;
   },
-  async reject(connection: Connection, keypair: Keypair, peer: PublicKey) {
-    const mePda = StemHelpers.getDescriptorPda(keypair.publicKey);
+  async reject(wallet: any, peer: PublicKey) {
+    const mePda = StemHelpers.getDescriptorPda(wallet.publicKey);
     const peerPda = StemHelpers.getDescriptorPda(peer);
 
     if (!mePda || !peerPda) {
@@ -256,7 +255,7 @@ export const Stem = {
       programId: PROGRAM_ID,
       keys: [
         {
-          pubkey: keypair.publicKey,
+          pubkey: wallet.publicKey,
           isSigner: true,
           isWritable: false,
         },
@@ -280,12 +279,12 @@ export const Stem = {
     });
 
     const tx = new Transaction().add(ix);
-    const signature = await connection.sendTransaction(tx, [keypair]);
+    const signature = await wallet.signTransaction(tx);
     console.log("✅ Peer rejected");
     return signature;
   },
-  async accept(connection: Connection, keypair: Keypair, peer: PublicKey) {
-    const mePda = StemHelpers.getDescriptorPda(keypair.publicKey);
+  async accept(wallet: any, peer: PublicKey) {
+    const mePda = StemHelpers.getDescriptorPda(wallet.publicKey);
     const peerPda = StemHelpers.getDescriptorPda(peer);
 
     if (!mePda || !peerPda) {
@@ -296,7 +295,7 @@ export const Stem = {
       programId: PROGRAM_ID,
       keys: [
         {
-          pubkey: keypair.publicKey,
+          pubkey: wallet.publicKey,
           isSigner: true,
           isWritable: false,
         },
@@ -316,7 +315,7 @@ export const Stem = {
           isWritable: true,
         },
         {
-          pubkey: StemHelpers.getChatPda(keypair.publicKey, peer),
+          pubkey: StemHelpers.getChatPda(wallet.publicKey, peer),
           isSigner: false,
           isWritable: true,
         },
@@ -328,22 +327,17 @@ export const Stem = {
       ],
       data: Buffer.concat([
         Buffer.from(disc("accept")),
-        StemHelpers.getChatHash(keypair.publicKey, peer),
+        StemHelpers.getChatHash(wallet.publicKey, peer),
       ]),
     });
 
     const tx = new Transaction().add(ix);
-    const signature = await connection.sendTransaction(tx, [keypair]);
+    const signature = await wallet.signTransaction(tx);
     console.log("✅ Peer accepted");
     return signature;
   },
-  async sendMessage(
-    connection: Connection,
-    keypair: Keypair,
-    peer: PublicKey,
-    content: string
-  ) {
-    const chatPda = StemHelpers.getChatPda(keypair.publicKey, peer);
+  async sendMessage(wallet: any, peer: PublicKey, content: string) {
+    const chatPda = StemHelpers.getChatPda(wallet.publicKey, peer);
 
     const buf = Buffer.alloc(4);
     buf.writeUInt32LE(content.length, 0);
@@ -352,7 +346,7 @@ export const Stem = {
       programId: PROGRAM_ID,
       keys: [
         {
-          pubkey: keypair.publicKey,
+          pubkey: wallet.publicKey,
           isSigner: true,
           isWritable: false,
         },
@@ -369,14 +363,14 @@ export const Stem = {
       ],
       data: Buffer.concat([
         Buffer.from(disc("sendmessage")),
-        StemHelpers.getChatHash(keypair.publicKey, peer),
+        StemHelpers.getChatHash(wallet.publicKey, peer),
         buf,
         Buffer.from(content),
       ]),
     });
 
     const tx = new Transaction().add(ix);
-    const signature = await connection.sendTransaction(tx, [keypair]);
+    const signature = await wallet.signTransaction(tx);
     console.log("✅ Message sent");
     return signature;
   },
