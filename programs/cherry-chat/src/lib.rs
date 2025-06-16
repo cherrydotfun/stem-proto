@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-declare_id!("BjheWDpSQGu1VmY1MHQPzvyBZDWvAnfrnw55mHr33BRB");
+declare_id!("JpfupjaeizdzWF4UoHjheKWGoogfS1sp9gScURgT2ZX");
 
 #[program]
 pub mod cherry_chat {

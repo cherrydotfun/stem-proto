@@ -14,7 +14,7 @@ import { createHash } from "crypto";
 import * as borsh from "borsh";
 
 const PROGRAM_ID = new PublicKey(
-  "BjheWDpSQGu1VmY1MHQPzvyBZDWvAnfrnw55mHr33BRB"
+  "JpfupjaeizdzWF4UoHjheKWGoogfS1sp9gScURgT2ZX"
 );
 const SEED_DESCRIPTOR = Buffer.from("wallet_descriptor");
 const SEED_PRIVATE_CHAT = Buffer.from("privite_chat");

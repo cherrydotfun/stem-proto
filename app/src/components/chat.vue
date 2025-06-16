@@ -36,6 +36,7 @@
     flex-direction: column;
     align-items: flex-start;
     margin-bottom: 10px;
+
   }
   .message {
     width: 100%;
