@@ -10,6 +10,8 @@ pub enum ErrorCode {
     NotInvited,
     #[msg("Not requested")]
     NotRequested,
+    #[msg("Not in chat")]
+    NotInChat,
 }
 
 #[program]
@@ -55,8 +57,8 @@ pub mod cherry_chat {
         let peer_descriptor = &mut ctx.accounts.peer_descriptor;
         let private_chat = &mut ctx.accounts.private_chat;
 
-        require!(me_descriptor.peers.iter().find(|p| p.wallet == peer.key() && p.state == PeerState::Invited).is_some(), ErrorCode::NotInvited);
-        require!(peer_descriptor.peers.iter().find(|p| p.wallet == me.key() && p.state == PeerState::Requested).is_some(), ErrorCode::NotRequested);
+        require!(me_descriptor.peers.iter().find(|p| p.wallet == peer.key() && p.state == PeerState::Requested).is_some(), ErrorCode::NotRequested);
+        require!(peer_descriptor.peers.iter().find(|p| p.wallet == me.key() && p.state == PeerState::Invited).is_some(), ErrorCode::NotInvited);
 
         for p in me_descriptor.peers.iter_mut() {
             if p.wallet == peer.key() {
@@ -83,8 +85,8 @@ pub mod cherry_chat {
         let me_descriptor = &mut ctx.accounts.payer_descriptor;
         let peer_descriptor = &mut ctx.accounts.peer_descriptor;
 
-        require!(me_descriptor.peers.iter().find(|p| p.wallet == peer.key() && p.state == PeerState::Invited).is_some(), ErrorCode::NotInvited);
-        require!(peer_descriptor.peers.iter().find(|p| p.wallet == me.key() && p.state == PeerState::Requested).is_some(), ErrorCode::NotRequested);
+        require!(me_descriptor.peers.iter().find(|p| p.wallet == peer.key() && p.state == PeerState::Requested).is_some(), ErrorCode::NotRequested);
+        require!(peer_descriptor.peers.iter().find(|p| p.wallet == me.key() && p.state == PeerState::Invited).is_some(), ErrorCode::NotInvited);
 
         for p in me_descriptor.peers.iter_mut() {
             if p.wallet == peer.key() {
@@ -108,6 +110,8 @@ pub mod cherry_chat {
         let payer = &mut ctx.accounts.payer;
         let private_chat = &mut ctx.accounts.private_chat;
 
+        require!(private_chat.wallets.iter().find(|w| *w == &payer.key()).is_some(), ErrorCode::NotInChat);
+
         let current_timestamp = Clock::get().unwrap().unix_timestamp;
 
         private_chat.messages.push(PrivateMessage {
@@ -115,6 +119,7 @@ pub mod cherry_chat {
             content,
             timestamp: current_timestamp,
         });
+
         let message_length = 32 + 4 + private_chat.messages.last().unwrap().content.len() as u32 + 8;
         private_chat.length += message_length;
 
