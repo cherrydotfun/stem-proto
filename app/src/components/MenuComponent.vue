@@ -2,7 +2,7 @@
   <div class="menu">
     <div class="user-info">
       <AvatarComponent :userKey="props.userKey" />
-      <div class="user-key" @click="copyKey" :title="'Нажмите чтобы скопировать'">
+      <div class="user-key" @click="copyKey" :title="'Click to copy'">
         {{ props.userKey.slice(0, 4) }}...{{
         props.userKey.slice(-4)
       }}
@@ -14,38 +14,38 @@
           <AvatarComponent :userKey="peer.pubkey.toBase58()" />
           <div class="peer-info">
             <div class="peer-key">{{ peer.pubkey.toBase58().slice(0, 4) }}...{{ peer.pubkey.toBase58().slice(-4) }}</div>
-            <div class="peer-status">Активный чат</div>
+            <div class="peer-status">Active chat</div>
           </div>
         </div>
       </div>
       <div v-else class="no-chats">
-        Нет активных чатов
+        No active chats
       </div>
     </div>
     <div class="invites-list" v-if="walletDescriptor.isRegistered">
-      <div class="section-title">Запросы на чат</div>
+      <div class="section-title">Chat Requests</div>
       <div v-for="peer in requestedPeers" :key="peer.pubkey.toBase58()" class="invite-item">
         <AvatarComponent :userKey="peer.pubkey.toBase58()" />
         <div class="peer-info">
           <div class="peer-key">{{ peer.pubkey.toBase58().slice(0, 4) }}...{{ peer.pubkey.toBase58().slice(-4) }}</div>
           <div class="invite-actions">
-            <button @click="acceptPeer(peer.pubkey)" class="accept-button">Принять</button>
-            <button @click="rejectPeer(peer.pubkey)" class="reject-button">Отклонить</button>
+            <button @click="acceptPeer(peer.pubkey)" class="accept-button">Accept</button>
+            <button @click="rejectPeer(peer.pubkey)" class="reject-button">Reject</button>
           </div>
         </div>
       </div>
       <div v-if="!requestedPeers.length" class="no-invites">
-        Нет активных запросов
+        No active requests
       </div>
     </div>
     <div class="invite-form">
       <input 
         type="text" 
         v-model="invitee" 
-        placeholder="Введите публичный ключ"
+        placeholder="Enter public key"
         class="invite-input"
       />
-      <button @click="invite" class="invite-button">Пригласить</button>
+      <button @click="invite" class="invite-button">Invite</button>
     </div>
   </div>
 </template>
@@ -117,10 +117,10 @@ const rejectPeer = (peer: PublicKey) => {
 const copyKey = async () => {
   try {
     await navigator.clipboard.writeText(props.userKey);
-    alert('Ключ скопирован в буфер обмена');
+    alert('Key copied to clipboard');
   } catch (err) {
-    console.error('Ошибка при копировании:', err);
-    alert('Не удалось скопировать ключ');
+    console.error('Error copying:', err);
+    alert('Failed to copy key');
   }
 };
 </script>
@@ -135,10 +135,10 @@ const copyKey = async () => {
 .user-info {
   display: flex;
   flex-direction: row;
-  margin: 20px;
   align-items: center;
   gap: 30px;
-  padding-bottom: 20px;
+  padding: 20px;
+  padding-bottom: 40px;
   border-bottom: 1px solid var(--purple-color);
 }
 
@@ -246,6 +246,7 @@ const copyKey = async () => {
   padding: 20px;
   border-top: 1px solid var(--purple-color);
   display: flex;
+  flex-direction: column;
   gap: 10px;
 }
 

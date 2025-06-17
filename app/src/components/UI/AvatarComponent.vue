@@ -18,9 +18,8 @@ console.log(props.userKey);
 
 <style scoped>
 .avatar {
-    width: 72px;
-    aspect-ratio: 1/1;
-    height: auto;
+    width: 36px;
+    height: 36px;
     border-radius: 150px;
     background-color: var(--purple-color);
     border: 1px solid var(--purple-color);
@@ -33,7 +32,7 @@ console.log(props.userKey);
 }
 
 .avatar-letter {
-    font-size: 48px;
+    font-size: 22px;
     color: white;
     font-weight: bold;
     display: flex;

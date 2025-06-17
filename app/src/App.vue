@@ -5,20 +5,20 @@
         <template v-if="!keypair">
           <div class="auth-container">
             <div v-if="hasSavedKeypair">
-              <h2>У вас есть сохраненный ключ</h2>
+              <h2>You have a saved key</h2>
               <div>
-                <button @click="loadKeypair">Загрузить ключ из хранилища</button>
+                <button @click="loadKeypair">Load key from storage</button>
               </div>
             </div>
             <div>
-              <button @click="generateKeypair">Создать новый ключ</button>
+              <button @click="generateKeypair">Create new key</button>
             </div>
           </div>
         </template>
         <template v-else-if="!walletDescriptor.isRegistered">
           <div class="auth-container">
-            <div>Аккаунт не зарегистрирован в Cherry chat.</div>
-            <button @click="register">Зарегистрироваться</button>
+            <div>Account is not registered in Cherry chat.</div>
+            <button @click="register">Register</button>
 
             <button @click="requestAirdrop">Request Airdrop</button>
           </div>
@@ -33,10 +33,10 @@
           />
         </template>
       </div>
-      <div class="chat">
-        <div v-if="chatPeer">
+      <div class="chat-container">
+        <div v-if="chatPeer" class="chat-container-inner">
           <div class="chat-header">
-            Чат с {{ chatPeer.toBase58().slice(0, 4) }}...{{
+            Chat with {{ chatPeer.toBase58().slice(0, 4) }}...{{
               chatPeer.toBase58().slice(-4)
             }}
           </div>
@@ -45,11 +45,11 @@
           </div>
           <div class="chat-input">
             <input type="text" v-model="message" />
-            <button @click="sendMessage">Отправить</button>
+            <button @click="sendMessage">Send</button>
           </div>
         </div>
         <div v-else class="chat-placeholder">
-          Выберите чат для начала общения
+          Select a chat to start communication
         </div>
       </div>
     </div>
@@ -194,7 +194,7 @@
       } catch (error) {
         console.error("Airdrop failed:", error);
         if (error instanceof Error) {
-          alert(`Ошибка при получении SOL: ${error.message}`);
+          alert(`Error getting SOL: ${error.message}`);
         }
       }
     }
@@ -213,17 +213,16 @@
         
         await Stem.register(solana.connection, keypair.value);
       } catch (error) {
-        console.error("Ошибка при регистрации:", error);
+        console.error("Registration error:", error);
         if (error instanceof Error) {
-          alert(`Ошибка при регистрации: ${error.message}`);
+          alert(`Registration error: ${error.message}`);
         }
       }
     }
   };
 
-  const invitee = ref<string>("");
-  const invite = () => {
-    const inviteePubkey = new PublicKey(invitee.value);
+  const invite = (invitee: string) => {
+    const inviteePubkey = new PublicKey(invitee);
     if (keypair.value && inviteePubkey) {
       Stem.invite(solana.connection, keypair.value, inviteePubkey);
     }
@@ -275,10 +274,11 @@
   border-right: 1px solid var(--purple-color);
 }
 
-.chat {
+.chat-container {
   display: flex;
   flex-direction: column;
   height: 100%;
+  background-color: rgb(31, 30, 30);
 }
 
 .chat-header {
@@ -299,6 +299,8 @@
   border-top: 1px solid var(--purple-color);
   display: flex;
   gap: 10px;
+  position: sticky;
+  bottom: 0;
 }
 
 .chat-input input {
@@ -353,5 +355,12 @@
 
 .auth-container button:hover {
   opacity: 0.9;
+}
+
+.chat-container-inner {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background-color: rgb(31, 30, 30);
 }
 </style>

@@ -179,7 +179,7 @@ export const Stem = {
     console.log(ix);
     const tx = new Transaction().add(ix);
     await connection.sendTransaction(tx, [keypair]);
-    console.log("✅ PDA инициализирована");
+    console.log("✅ PDA initialized");
   },
   deserializeDescriptor: (data: Buffer) => {
     const descriptor = borsh.deserialize(DescriptorSchema, data);
