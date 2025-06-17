@@ -1,20 +1,5 @@
 <template>
   <div>
-    <!-- <div v-if="!keypair">
-      <div v-if="hasSavedKeypair">
-        <h2>You have a saved keypair</h2>
-        <div>
-          <button @click="loadKeypair">Load Keypair from storage</button>
-        </div>
-      </div>
-      <div>
-        <button @click="generateKeypair">Generate new keypair</button>
-      </div>
-      <div v-if="localWallet.installed">
-        <button @click="localWallet.connect()">Connect to local wallet</button>
-      </div>
-    </div> -->
-    <div>{{ wallet }}</div>
     <div v-if="!publicKey">
       <button @click="selectWallet('Local')">Connect to local wallet</button>
       <button @click="selectWallet('Phantom')">
