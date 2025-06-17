@@ -13,8 +13,25 @@
             </button>
           </div>
         </template>
-        <template v-else-if="!walletDescriptor.isRegistered">
-          <PubKey :pubkey="publicKey" />
+        <template v-else>
+          <div class="user-info">
+            <AvatarComponent :userKey="publicKey.toBase58()" />
+            <div class="user-info-text">
+              <div class="user-key" @click="copyKey" :title="'Click to copy'">
+                {{ publicKey.toBase58().slice(0, 4) }}...{{
+                  publicKey.toBase58().slice(-4)
+                }}
+              </div>
+              <div class="user-balance">
+                {{
+                  (myAccountInfo.accountInfo?.lamports || 0) / LAMPORTS_PER_SOL
+                }}
+                SOL
+              </div>
+            </div>
+          </div>
+        </template>
+        <template v-if="publicKey && !walletDescriptor.isRegistered">
           <div class="auth-container">
             <div>Account is not registered in Cherry chat.</div>
             <button @click="register">Register</button>
@@ -22,9 +39,10 @@
             <button @click="requestAirdrop">Request Airdrop</button>
           </div>
         </template>
-        <template v-else>
+        <template v-if="publicKey && walletDescriptor.isRegistered">
           <MenuComponent
             :userKey="publicKey?.toBase58() || ''"
+            :currentChat="chatPeer"
             @openChat="openChat"
             @invite="invite"
             @acceptPeer="acceptPeer"
@@ -55,14 +73,26 @@
   </div>
 </template>
 <script setup lang="ts">
+  import {
+    initSolana,
+    getRawSolana,
+    getAccountInfo,
+    getWalletDescriptor,
+    getChatData,
+  } from "./composables/stem";
+  const rpcUrl = import.meta.env.VITE_RPC_URL || "http://localhost:8899";
+  initSolana(rpcUrl);
+
+  import AvatarComponent from "./components/UI/AvatarComponent.vue";
+
   import { useLocalWallet } from "./composables/localWallet";
   import { usePhantomWallet } from "./composables/phantomWallet";
 
   import { useWallet } from "./composables/wallet";
 
   const { wallet, names, selectWallet } = useWallet([
-    useLocalWallet(),
-    usePhantomWallet(),
+    useLocalWallet(rpcUrl),
+    usePhantomWallet(rpcUrl),
   ]);
 
   const publicKey = computed(() => wallet.value?.publicKey || null);
@@ -72,22 +102,25 @@
     wallet.value?.connect();
   };
 
+  const copyKey = async () => {
+    try {
+      await navigator.clipboard.writeText(publicKey.value?.toBase58() || "");
+      alert("Key copied to clipboard");
+    } catch (err) {
+      console.error("Error copying:", err);
+      alert("Failed to copy key");
+    }
+  };
+
   // import { Stem } from "~/utils/stem";
-  import { Keypair, PublicKey, LAMPORTS_PER_SOL } from "@solana/web3.js";
-  import {
-    getAccountInfo,
-    getRawSolana,
-    getWalletDescriptor,
-    getChatData,
-  } from "./composables/stem";
-  import { Stem, PeerState } from "./utils/stem";
+  import { PublicKey, LAMPORTS_PER_SOL } from "@solana/web3.js";
+
+  import { Stem } from "./utils/stem";
   import { ref, computed } from "vue";
-  import PubKey from "./components/PubKey.vue";
   import Chat from "./components/chat.vue";
   import MenuComponent from "./components/MenuComponent.vue";
   const solana = getRawSolana();
 
-  const keypair = ref<Keypair | null>(null);
   const myAccountInfo = getAccountInfo(publicKey);
 
   const requestAirdrop = async () => {
@@ -136,7 +169,10 @@
 
   const chatPeer = ref<PublicKey | null>(null);
 
-  const chatData = getChatData(publicKey, chatPeer);
+  const chatData = getChatData(
+    publicKey,
+    computed(() => chatPeer.value)
+  );
 
   const openChat = (peer: PublicKey) => {
     chatPeer.value = peer;
@@ -156,7 +192,7 @@
   .page-container {
     background-color: var(--black-color);
     display: grid;
-    grid-template-columns: 20% 80%;
+    grid-template-columns: 245px 1fr;
     height: 100vh;
     width: 100vw;
   }
@@ -253,5 +289,13 @@
     flex-direction: column;
     height: 100%;
     background-color: rgb(31, 30, 30);
+  }
+
+  .user-info {
+    padding: 20px;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    border-bottom: 1px solid var(--purple-color);
   }
 </style>

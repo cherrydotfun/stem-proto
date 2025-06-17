@@ -1,11 +1,11 @@
 import { PhantomWalletAdapter } from "@solana/wallet-adapter-phantom";
 import { Connection, PublicKey, Transaction } from "@solana/web3.js";
-import { ref, computed } from "vue";
+import { ref } from "vue";
 
-export const usePhantomWallet = () => {
+export const usePhantomWallet = (rpcUrl: string = "http://localhost:8899") => {
   const name = ref("Phantom");
   const wallet = new PhantomWalletAdapter();
-  const connection = new Connection("http://localhost:8899");
+  const connection = new Connection(rpcUrl);
 
   const publicKey = ref<PublicKey | null>(null);
   const connected = ref(false);

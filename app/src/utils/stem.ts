@@ -135,6 +135,18 @@ const ChatSchema: borsh.Schema = {
   },
 };
 
+type Message = {
+  sender: PublicKey;
+  content: string;
+  timestamp: Date;
+};
+
+type Chat = {
+  wallets: PublicKey[];
+  length: number;
+  messages: Message[];
+};
+
 export const PeerState = {
   Invited: 0,
   Requested: 1,
@@ -185,8 +197,8 @@ export const Stem = {
     return descriptor;
   },
   deserializeChat: (data: Buffer) => {
-    const chat = borsh.deserialize(ChatSchema, data);
-    console.log(chat);
+    const chat = borsh.deserialize(ChatSchema, data) as Chat;
+    // console.log(chat);
     chat.messages.forEach((message: any) => {
       message.sender = new PublicKey(message.sender);
       message.timestamp = new Date(

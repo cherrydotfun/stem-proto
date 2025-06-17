@@ -2,7 +2,11 @@ import { Solana, StemHelpers, Stem } from "../utils/stem";
 import { type AccountInfo, PublicKey } from "@solana/web3.js";
 import { ref, type ComputedRef, watchEffect, computed } from "vue";
 
-const solana = new Solana();
+let solana = new Solana();
+
+export const initSolana = (rpcUrl: string = "http://localhost:8899") => {
+  solana = new Solana(rpcUrl);
+};
 
 export const getRawSolana = () => {
   return solana;
@@ -83,7 +87,7 @@ function accountRef(timeout: number = 5000) {
 }
 
 type Peer = {
-  publicKey: PublicKey;
+  pubkey: PublicKey;
   status: number;
 };
 
@@ -101,9 +105,11 @@ export const getWalletDescriptor = (
   return computed(() => {
     const _tmp = _wallet.value;
     if (_tmp) {
-      console.log(_tmp.data);
-      const data = Stem.deserializeDescriptor(_tmp.data.subarray(8));
-      console.log(data);
+      // console.log(_tmp.data);
+      const data = Stem.deserializeDescriptor(
+        _tmp.data.subarray(8)
+      ) as WalletDescriptor;
+      // console.log(data);
       for (const peer of data.peers) {
         peer.pubkey = new PublicKey(peer.pubkey);
       }

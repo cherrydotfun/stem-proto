@@ -21,11 +21,9 @@
   </div>
 </template>
 <script lang="ts" setup>
-  import { ref } from "vue";
   import { PublicKey } from "@solana/web3.js";
-  import Pubkey from "./PubKey.vue";
 
-  const props = defineProps<{
+  defineProps<{
     chat: any;
     publicKey: PublicKey;
   }>();
@@ -50,7 +48,7 @@
   .message-content {
     padding: 10px 20px;
     border-radius: 3px;
-    background-color: #9945ff;
+    background-color: #14f195f0;
 
     color: #fff;
     min-width: 30%;
@@ -58,7 +56,7 @@
     transform: skew(-20deg);
   }
   .my .message-content {
-    background-color: #14f195;
+    background-color: #9945fff0;
     text-align: right;
     transform: skew(20deg);
   }
