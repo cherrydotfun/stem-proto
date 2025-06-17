@@ -1,72 +1,56 @@
 <template>
   <div>
-    <div v-if="!publicKey">
-      <button @click="selectWallet('Local')">Connect to local wallet</button>
-      <button @click="selectWallet('Phantom')">
-        Connect to phantom wallet
-      </button>
-      <button @click="connect">Connect</button>
-    </div>
+    <div class="page-container">
+      <div class="menu-container">
+        <template v-if="!publicKey">
+          <div class="auth-container">
+            <button
+              v-for="name in names"
+              @click="_selectWallet(name)"
+              :key="name"
+            >
+              Connect to {{ name }} wallet
+            </button>
+          </div>
+        </template>
+        <template v-else-if="!walletDescriptor.isRegistered">
+          <PubKey :pubkey="publicKey" />
+          <div class="auth-container">
+            <div>Account is not registered in Cherry chat.</div>
+            <button @click="register">Register</button>
 
-    <div v-if="publicKey">
-      <!-- <button @click="generateKeypair">Generate new keypair</button> -->
-      <div>Public key: {{ wallet.publicKey }}</div>
-      <!-- {{ myAccountInfo }} -->
-      <div v-if="myAccountInfo.isRegistered">
-        Balance: {{ solana.balance_sol(myAccountInfo.accountInfo) }} SOL | (-{{
-          1 - solana.balance_sol(myAccountInfo.accountInfo)
-        }}
-        SOL) |(-${{
-          (1 - solana.balance_sol(myAccountInfo.accountInfo)) * 145
-        }})
+            <button @click="requestAirdrop">Request Airdrop</button>
+          </div>
+        </template>
+        <template v-else>
+          <MenuComponent
+            :userKey="publicKey?.toBase58() || ''"
+            @openChat="openChat"
+            @invite="invite"
+            @acceptPeer="acceptPeer"
+            @rejectPeer="rejectPeer"
+          />
+        </template>
       </div>
-      <div v-else>Account is not initialized. Request Airdrop before.</div>
-    </div>
-    <div>
-      <button @click="requestAirdrop">Request Airdrop</button>
-    </div>
-    <hr />
-    <div v-if="!walletDescriptor.isRegistered">
-      <div>Account is not registered in Cherry chat.</div>
-      <button @click="register">Register</button>
-    </div>
-    <div v-else>
-      <h2>Your peers</h2>
-      <div
-        v-for="peer in walletDescriptor.data?.peers"
-        :key="peer.pubkey.toBase58()"
-      >
-        <div>
-          <PubKey :pubkey="peer.pubkey" />
-          <b>[{{ PeerState[peer.status] }}]</b>
-          <span v-if="peer.status === PeerState.Requested">
-            <button @click="acceptPeer(peer.pubkey)">Accept</button>
-            <button @click="rejectPeer(peer.pubkey)">Reject</button>
-          </span>
-          <span v-if="peer.status === PeerState.Accepted">
-            <button @click="openChat(peer.pubkey)">Open chat</button>
-          </span>
+      <div class="chat-container">
+        <div v-if="chatPeer" class="chat-container-inner">
+          <div class="chat-header">
+            Chat with {{ chatPeer.toBase58().slice(0, 4) }}...{{
+              chatPeer.toBase58().slice(-4)
+            }}
+          </div>
+          <div class="chat-messages">
+            <chat :chat="chatData" :publicKey="publicKey" />
+          </div>
+          <div class="chat-input">
+            <input type="text" v-model="message" />
+            <button @click="sendMessage">Send</button>
+          </div>
+        </div>
+        <div v-else class="chat-placeholder">
+          Select a chat to start communication
         </div>
       </div>
-      <div>
-        <input type="text" v-model="invitee" />
-        <button @click="invite">Invite peer</button>
-      </div>
-    </div>
-  </div>
-  <hr />
-  <div v-if="chatPeer">
-    <div>
-      Chat with {{ chatPeer.toBase58().slice(0, 4) }}...{{
-        chatPeer.toBase58().slice(-4)
-      }}
-    </div>
-    <div>
-      <chat :chat="chatData" :publicKey="publicKey" />
-    </div>
-    <div>
-      <input type="text" v-model="message" />
-      <button @click="sendMessage">Send message</button>
     </div>
   </div>
 </template>
@@ -81,9 +65,15 @@
     usePhantomWallet(),
   ]);
 
-  // console.log(wallet.value);
+  const publicKey = computed(() => wallet.value?.publicKey || null);
 
-  import { PublicKey } from "@solana/web3.js";
+  const _selectWallet = (name: string) => {
+    selectWallet(name);
+    wallet.value?.connect();
+  };
+
+  // import { Stem } from "~/utils/stem";
+  import { Keypair, PublicKey, LAMPORTS_PER_SOL } from "@solana/web3.js";
   import {
     getAccountInfo,
     getRawSolana,
@@ -91,37 +81,44 @@
     getChatData,
   } from "./composables/stem";
   import { Stem, PeerState } from "./utils/stem";
-  import { ref, computed, unref } from "vue";
+  import { ref, computed } from "vue";
   import PubKey from "./components/PubKey.vue";
   import Chat from "./components/chat.vue";
-
+  import MenuComponent from "./components/MenuComponent.vue";
   const solana = getRawSolana();
 
-  const publicKey = computed(() => wallet.value?.publicKey || null);
+  const keypair = ref<Keypair | null>(null);
   const myAccountInfo = getAccountInfo(publicKey);
 
   const requestAirdrop = async () => {
     console.log("Requesting airdrop");
     if (publicKey.value) {
-      await solana.requestAirdrop(publicKey.value);
+      try {
+        const signature = await solana.connection.requestAirdrop(
+          publicKey.value,
+          LAMPORTS_PER_SOL
+        );
+        await solana.connection.confirmTransaction(signature);
+        console.log("Airdrop successful");
+      } catch (error) {
+        console.error("Airdrop failed:", error);
+        if (error instanceof Error) {
+          alert(`Error getting SOL: ${error.message}`);
+        }
+      }
     }
-  };
-
-  const connect = () => {
-    wallet.value.connect();
   };
 
   const walletDescriptor = getWalletDescriptor(publicKey);
 
   const register = () => {
     if (wallet.value.publicKey) {
-      Stem.register(unref(wallet));
+      Stem.register(wallet.value);
     }
   };
 
-  const invitee = ref<string>("");
-  const invite = () => {
-    const inviteePubkey = new PublicKey(invitee.value);
+  const invite = (invitee: string) => {
+    const inviteePubkey = new PublicKey(invitee);
     if (wallet.value.publicKey && inviteePubkey) {
       Stem.invite(wallet.value, inviteePubkey);
     }
@@ -154,3 +151,107 @@
     }
   };
 </script>
+
+<style scoped>
+  .page-container {
+    background-color: var(--black-color);
+    display: grid;
+    grid-template-columns: 20% 80%;
+    height: 100vh;
+    width: 100vw;
+  }
+
+  .menu-container {
+    border-right: 1px solid var(--purple-color);
+  }
+
+  .chat-container {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    background-color: rgb(31, 30, 30);
+  }
+
+  .chat-header {
+    padding: 20px;
+    border-bottom: 1px solid var(--purple-color);
+    font-size: 18px;
+    color: var(--white-color);
+  }
+
+  .chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+  }
+
+  .chat-input {
+    padding: 20px;
+    border-top: 1px solid var(--purple-color);
+    display: flex;
+    gap: 10px;
+    position: sticky;
+    bottom: 0;
+  }
+
+  .chat-input input {
+    flex: 1;
+    padding: 10px;
+    border-radius: 5px;
+    border: 1px solid var(--purple-color);
+    background-color: var(--black-color);
+    color: var(--white-color);
+  }
+
+  .chat-input button {
+    padding: 10px 20px;
+    border-radius: 5px;
+    background-color: var(--purple-color);
+    color: var(--white-color);
+    border: none;
+    cursor: pointer;
+  }
+
+  .chat-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: var(--white-color);
+    font-size: 18px;
+  }
+
+  .auth-container {
+    padding: 20px;
+    color: var(--white-color);
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .auth-container h2 {
+    margin-bottom: 15px;
+  }
+
+  .auth-container button {
+    padding: 10px 20px;
+    border-radius: 5px;
+    background-color: var(--purple-color);
+    color: var(--white-color);
+    border: none;
+    cursor: pointer;
+    width: 100%;
+    max-width: 300px;
+  }
+
+  .auth-container button:hover {
+    opacity: 0.9;
+  }
+
+  .chat-container-inner {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    background-color: rgb(31, 30, 30);
+  }
+</style>

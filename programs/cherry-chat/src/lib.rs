@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use sha2::{Sha256, Digest};
 
-declare_id!("JpfupjaeizdzWF4UoHjheKWGoogfS1sp9gScURgT2ZX");
+declare_id!("BjheWDpSQGu1VmY1MHQPzvyBZDWvAnfrnw55mHr33BRB");
 
 #[error_code]
 pub enum ErrorCode {
