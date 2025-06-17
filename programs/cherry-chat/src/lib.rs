@@ -1,4 +1,5 @@
 use anchor_lang::prelude::*;
+use sha2::{Sha256, Digest};
 
 declare_id!("BjheWDpSQGu1VmY1MHQPzvyBZDWvAnfrnw55mHr33BRB");
 
@@ -12,11 +13,37 @@ pub enum ErrorCode {
     NotRequested,
     #[msg("Not in chat")]
     NotInChat,
+    #[msg("Invalid hash")]
+    InvalidHash,
+}
+
+fn get_hash(a: Pubkey, b: Pubkey) -> [u8; 32] {
+    let mut c: [u8; 64] = [0; 64];
+
+    for i in 0..32 {
+        if a.to_bytes()[i] == b.to_bytes()[i] {
+            continue;
+        }
+        if a.to_bytes()[i] < b.to_bytes()[i] {
+            c[0..32].copy_from_slice(&a.to_bytes());
+            c[32..64].copy_from_slice(&b.to_bytes());
+        } else {
+            c[0..32].copy_from_slice(&b.to_bytes());
+            c[32..64].copy_from_slice(&a.to_bytes());
+        }
+        break;
+    }
+
+    let hash = Sha256::digest(c);
+    let mut hash_array: [u8; 32] = [0; 32];
+    hash_array.copy_from_slice(&hash[..32]);
+    hash_array
 }
 
 #[program]
 pub mod cherry_chat {
     use super::*;
+
 
     pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
         msg!("Greetings from: {:?}", ctx.program_id);
@@ -59,6 +86,9 @@ pub mod cherry_chat {
 
         require!(me_descriptor.peers.iter().find(|p| p.wallet == peer.key() && p.state == PeerState::Requested).is_some(), ErrorCode::NotRequested);
         require!(peer_descriptor.peers.iter().find(|p| p.wallet == me.key() && p.state == PeerState::Invited).is_some(), ErrorCode::NotInvited);
+
+        let hash = get_hash(me.key(), peer.key());
+        require!(hash == _hash, ErrorCode::InvalidHash);
 
         for p in me_descriptor.peers.iter_mut() {
             if p.wallet == peer.key() {
