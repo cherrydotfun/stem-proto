@@ -4,7 +4,6 @@ WORKDIR /build
 
 # Копируем все файлы проекта
 COPY . .
-ENV NODE_ENV=production
 RUN npm install
 RUN VITE_RPC_URL=https://api.devnet.solana.com npm run build
 

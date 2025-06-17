@@ -1,0 +1,32 @@
+name: Build&Deploy
+run-name: ${{ gitea.actor }} pushed  to repo🚀
+on:
+  push:
+    branches:
+      - master
+      # - demo
+      # - release
+
+jobs:
+  build-client:
+    runs-on: ubuntu-latest
+    container:
+      image: catthehacker/ubuntu:act-latest
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v3
+      - id: commit
+        uses: prompt/actions-commit-hash@v3
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: gitea.wfc.monster
+          username: ${{ vars.USERNAME }}
+          password: ${{ secrets.PASSWORD }}
+      - name: Build client image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./app
+          file: ./app/Dockerfile
+          push: true
+          tags: gitea.wfc.monster/cherry/cherry-chat/web:${{ steps.commit.outputs.short }}
