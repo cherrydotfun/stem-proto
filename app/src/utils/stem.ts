@@ -23,7 +23,11 @@ export class Solana {
   static LAMPORTS_PER_SOL: number = LAMPORTS_PER_SOL;
 
   constructor(rpcUrl: string = "http://localhost:8899") {
-    this.connection = new Connection(rpcUrl, "confirmed");
+    this.connection = new Connection(rpcUrl, {
+      wsEndpoint: "ws://localhost:8900",
+      commitment: "finalized",
+      // commitment: "confirmed",
+    });
   }
 
   async getAccountInfo(publicKey: PublicKey) {
@@ -39,6 +43,24 @@ export class Solana {
       LAMPORTS_PER_SOL
     );
     await this.connection.confirmTransaction(signature, "confirmed");
+  }
+  subscribeToProgram(programId: PublicKey) {
+    console.log("Subscribing to program", programId.toBase58());
+    return this.connection.onProgramAccountChange(programId, (accountInfo) => {
+      console.log("Program changed", accountInfo);
+    });
+  }
+  subscribeToAccount(publicKey: PublicKey) {
+    console.log("Subscribing to account", publicKey.toBase58());
+    return this.connection.onAccountChange(publicKey, (accountInfo, ctx) => {
+      console.log("Account changed", accountInfo, ctx);
+    });
+  }
+  subscribeToLogs(publicKey: PublicKey) {
+    console.log("Subscribing to logs", publicKey.toBase58());
+    return this.connection.onLogs(publicKey, (logs) => {
+      console.log("Logs", logs);
+    });
   }
 }
 

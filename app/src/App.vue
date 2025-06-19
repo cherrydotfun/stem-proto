@@ -97,9 +97,17 @@
 
   const publicKey = computed(() => wallet.value?.publicKey || null);
 
-  const _selectWallet = (name: string) => {
+  const _selectWallet = async (name: string) => {
     selectWallet(name);
-    wallet.value?.connect();
+    await wallet.value?.connect();
+    // solana.subscribeToAccount(publicKey.value);
+    // solana.subscribeToProgram(
+    //   new PublicKey("BjheWDpSQGu1VmY1MHQPzvyBZDWvAnfrnw55mHr33BRB")
+    // );
+    solana.subscribeToLogs(
+      // new PublicKey("BjheWDpSQGu1VmY1MHQPzvyBZDWvAnfrnw55mHr33BRB")
+      publicKey.value
+    );
   };
 
   const copyKey = async () => {

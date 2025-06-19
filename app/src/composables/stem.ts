@@ -24,7 +24,7 @@ export const getAccountInfo = (publicKey: ComputedRef<PublicKey | null>) => {
   });
 
   const _loadData = async () => {
-    console.log("Loading data", publicKey.value);
+    // console.log("Loading data", publicKey.value);
     if (publicKey.value) {
       const _tmp = await solana.getAccountInfo(publicKey.value);
       accountInfo.value = {
@@ -61,7 +61,7 @@ function accountRef(timeout: number = 5000) {
     const _account = ref<AccountInfo<Buffer> | null>(null);
 
     const _loadData = async () => {
-      console.log("Loading data", publicKey.value?.toBase58());
+      // console.log("Loading data", publicKey.value?.toBase58());
       if (publicKey.value) {
         const _tmp = await solana.getAccountInfo(publicKey.value);
         _account.value = _tmp;
@@ -75,7 +75,7 @@ function accountRef(timeout: number = 5000) {
         _interval = setInterval(_loadData, timeout);
       }
       onCleanup(() => {
-        console.log("Clearing interval");
+        // console.log("Clearing interval");
         if (_interval) {
           clearInterval(_interval);
         }
