@@ -1,17 +1,41 @@
 <template>
-  <div class="menu">
-    <div class="chats-list">
-      <div v-if="walletDescriptor.isRegistered">
-        <div class="section-title">Chats</div>
+  <div class="menu" :class="{ 'collapsed': isCollapsed }">
+    <div class="scrollable-content">
+      <div class="chats-list">
+        <div v-if="walletDescriptor.isRegistered">
+          <div class="section-title">Chats</div>
+          <div
+            v-if="acceptedPeers.length"
+            v-for="peer in acceptedPeers"
+            :key="peer.pubkey.toBase58()"
+            @click="openChat(peer.pubkey)"
+            :class="{
+              'active-chat': currentChat?.toBase58() === peer.pubkey.toBase58(),
+              'chat-item': true,
+            }"
+          >
+            <AvatarComponent :userKey="peer.pubkey.toBase58()" />
+            <div class="peer-info" v-show="!isCollapsed">
+              <div class="peer-key">
+                {{ peer.pubkey.toBase58().slice(0, 4) }}...{{
+                  peer.pubkey.toBase58().slice(-4)
+                }}
+              </div>
+            </div>
+          </div>
+          <div v-else class="no-chats" v-show="!isCollapsed">No chats yet</div>
+        </div>
+      </div>
+      <div
+        class="invites-list"
+        v-if="walletDescriptor.isRegistered && requestedPeers.length"
+        v-show="!isCollapsed"
+      >
+        <div class="section-title">Chat Requests</div>
         <div
-          v-if="acceptedPeers.length"
-          v-for="peer in acceptedPeers"
+          v-for="peer in requestedPeers"
           :key="peer.pubkey.toBase58()"
-          @click="openChat(peer.pubkey)"
-          :class="{
-            'active-chat': currentChat?.toBase58() === peer.pubkey.toBase58(),
-            'chat-item': true,
-          }"
+          class="invite-item"
         >
           <AvatarComponent :userKey="peer.pubkey.toBase58()" />
           <div class="peer-info">
@@ -20,41 +44,19 @@
                 peer.pubkey.toBase58().slice(-4)
               }}
             </div>
-            <!-- <div class="peer-status">Active chat</div> -->
-          </div>
-        </div>
-        <div v-else class="no-chats">No chats yet</div>
-      </div>
-    </div>
-    <div
-      class="invites-list"
-      v-if="walletDescriptor.isRegistered && requestedPeers.length"
-    >
-      <div class="section-title">Chat Requests</div>
-      <div
-        v-for="peer in requestedPeers"
-        :key="peer.pubkey.toBase58()"
-        class="invite-item"
-      >
-        <AvatarComponent :userKey="peer.pubkey.toBase58()" />
-        <div class="peer-info">
-          <div class="peer-key">
-            {{ peer.pubkey.toBase58().slice(0, 4) }}...{{
-              peer.pubkey.toBase58().slice(-4)
-            }}
-          </div>
-          <div class="invite-actions">
-            <button @click="acceptPeer(peer.pubkey)" class="accept-button">
-              Accept
-            </button>
-            <button @click="rejectPeer(peer.pubkey)" class="reject-button">
-              Reject
-            </button>
+            <div class="invite-actions">
+              <button @click="acceptPeer(peer.pubkey)" class="accept-button">
+                Accept
+              </button>
+              <button @click="rejectPeer(peer.pubkey)" class="reject-button">
+                Reject
+              </button>
+            </div>
           </div>
         </div>
       </div>
     </div>
-    <div class="invite-form">
+    <div class="invite-form" v-show="!isCollapsed">
       <input
         type="text"
         v-model="invitee"
@@ -77,6 +79,7 @@
   interface MenuComponentProps {
     userKey: string;
     currentChat: PublicKey | null;
+    isCollapsed?: boolean;
   }
 
   interface Peer {
@@ -88,7 +91,9 @@
     peers: Peer[];
   }
 
-  const props = defineProps<MenuComponentProps>();
+  const props = withDefaults(defineProps<MenuComponentProps>(), {
+    isCollapsed: false,
+  });
 
   const emit = defineEmits<{
     (e: "openChat", peer: PublicKey): void;
@@ -137,22 +142,16 @@
   .menu {
     display: flex;
     flex-direction: column;
-    /* height: 100%; */
+    flex: 1;
+    overflow: hidden;
   }
 
-  .user-info {
-    display: flex;
-    flex-direction: row;
-    align-items: center;
-    gap: 30px;
-    padding: 20px;
-    padding-bottom: 40px;
-    border-bottom: 1px solid var(--purple-color);
+  .scrollable-content {
+    flex: 1;
+    overflow-y: auto;
   }
 
   .chats-list {
-    flex: 1;
-    overflow-y: auto;
     padding: 20px;
   }
 
@@ -249,13 +248,6 @@
     opacity: 0.9;
   }
 
-  .no-invites {
-    color: var(--white-color);
-    opacity: 0.7;
-    text-align: center;
-    padding: 10px;
-  }
-
   .invite-form {
     padding: 20px;
     border-top: 1px solid var(--purple-color);
@@ -283,16 +275,14 @@
     transition: opacity 0.2s;
   }
 
-  .invite-button:hover {
-    opacity: 0.9;
+  .menu.collapsed .section-title {
+    text-align: center;
+    margin-bottom: 10px;
   }
-
-  .user-key {
-    cursor: pointer;
-    transition: opacity 0.2s;
+  .menu.collapsed .chats-list {
+    padding: 10px 0;
   }
-
-  .user-key:hover {
-    opacity: 0.8;
+  .menu.collapsed .chat-item {
+    justify-content: center;
   }
 </style>

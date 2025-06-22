@@ -1,7 +1,12 @@
 <template>
   <div>
-    <div class="page-container">
+    <div class="page-container" :class="{ 'menu-collapsed': isMenuCollapsed }">
       <div class="menu-container">
+        <div class="menu-toggle" @click="toggleMenu">
+          <span v-if="isMenuCollapsed">☰</span>
+          <span v-else>✕</span>
+        </div>
+        
         <template v-if="!publicKey">
           <div class="auth-container">
             <button
@@ -16,7 +21,7 @@
         <template v-else>
           <div class="user-info">
             <AvatarComponent :userKey="publicKey.toBase58()" />
-            <div class="user-info-text">
+            <div class="user-info-text" v-show="!isMenuCollapsed">
               <div class="user-key" @click="copyKey" :title="'Click to copy'">
                 {{ publicKey.toBase58().slice(0, 4) }}...{{
                   publicKey.toBase58().slice(-4)
@@ -32,7 +37,7 @@
           </div>
         </template>
         <template v-if="publicKey && !walletDescriptor.isRegistered">
-          <div class="auth-container">
+          <div class="auth-container" v-show="!isMenuCollapsed">
             <div>Account is not registered in Cherry chat.</div>
             <button @click="register">Register</button>
 
@@ -43,6 +48,7 @@
           <MenuComponent
             :userKey="publicKey?.toBase58() || ''"
             :currentChat="chatPeer"
+            :isCollapsed="isMenuCollapsed"
             @openChat="openChat"
             @invite="invite"
             @acceptPeer="acceptPeer"
@@ -150,20 +156,39 @@
     }
   };
 
-  const invite = (invitee: string) => {
+  const invite = async (invitee: string) => {
     const inviteePubkey = new PublicKey(invitee);
     if (wallet.value.publicKey && inviteePubkey) {
-      Stem.invite(wallet.value, inviteePubkey);
+      try {
+        await Stem.invite(wallet.value, inviteePubkey);
+      } catch (error) {
+        console.error("Invite error:", error);
+        if (error instanceof Error && error.message.includes("0x1770")) {
+          alert("Этот пользователь уже был приглашен ранее. Вы можете принять или отклонить существующее приглашение.");
+        } else {
+          alert(`Ошибка при отправке приглашения: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
+        }
+      }
     }
   };
-  const rejectPeer = (peer: PublicKey) => {
+  const rejectPeer = async (peer: PublicKey) => {
     if (wallet.value.publicKey && peer) {
-      Stem.reject(wallet.value, peer);
+      try {
+        await Stem.reject(wallet.value, peer);
+      } catch (error) {
+        console.error("Reject error:", error);
+        alert(`Ошибка при отклонении приглашения: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
+      }
     }
   };
-  const acceptPeer = (peer: PublicKey) => {
+  const acceptPeer = async (peer: PublicKey) => {
     if (wallet.value.publicKey && peer) {
-      Stem.accept(wallet.value, peer);
+      try {
+        await Stem.accept(wallet.value, peer);
+      } catch (error) {
+        console.error("Accept error:", error);
+        alert(`Ошибка при принятии приглашения: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
+      }
     }
   };
 
@@ -186,6 +211,13 @@
       message.value = "";
     }
   };
+
+  // Menu collapse state
+  const isMenuCollapsed = ref(false);
+  
+  const toggleMenu = () => {
+    isMenuCollapsed.value = !isMenuCollapsed.value;
+  };
 </script>
 
 <style scoped>
@@ -194,17 +226,56 @@
     display: grid;
     grid-template-columns: 245px 1fr;
     height: 100vh;
-    width: 100vw;
+    width: 100%;
+    overflow: hidden;
+    transition: grid-template-columns 0.3s ease;
+  }
+
+  .page-container.menu-collapsed {
+    grid-template-columns: 80px 1fr;
   }
 
   .menu-container {
+    display: flex;
+    flex-direction: column;
     border-right: 1px solid var(--purple-color);
+    position: relative;
+    overflow: hidden;
+    padding-top: 50px;
+  }
+
+  .menu-toggle {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    width: 30px;
+    height: 30px;
+    background-color: var(--purple-color);
+    color: var(--white-color);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 1000;
+    font-size: 14px;
+    transition: all 0.3s ease;
+  }
+
+  .page-container.menu-collapsed .menu-toggle {
+    left: 50%;
+    transform: translateX(-50%);
+    right: auto;
+  }
+
+  .menu-toggle:hover {
+    background-color: rgba(150, 70, 253, 0.8);
   }
 
   .chat-container {
     display: flex;
     flex-direction: column;
-    height: 100%;
+    height: 100vh;
     background-color: rgb(31, 30, 30);
   }
 
@@ -213,6 +284,7 @@
     border-bottom: 1px solid var(--purple-color);
     font-size: 18px;
     color: var(--white-color);
+    flex-shrink: 0;
   }
 
   .chat-messages {
@@ -226,8 +298,7 @@
     border-top: 1px solid var(--purple-color);
     display: flex;
     gap: 10px;
-    position: sticky;
-    bottom: 0;
+    flex-shrink: 0;
   }
 
   .chat-input input {
@@ -288,6 +359,7 @@
     display: flex;
     flex-direction: column;
     height: 100%;
+    overflow: hidden;
     background-color: rgb(31, 30, 30);
   }
 
@@ -297,5 +369,16 @@
     flex-direction: row;
     align-items: center;
     border-bottom: 1px solid var(--purple-color);
+    transition: padding 0.3s ease;
+  }
+
+  .page-container.menu-collapsed .user-info {
+    justify-content: center;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--purple-color);
+  }
+
+  .user-info-text {
+    margin-left: 15px;
   }
 </style>

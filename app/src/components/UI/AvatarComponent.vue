@@ -1,5 +1,5 @@
 <template>
-  <div class="avatar" :class="{ 'has-avatar': avatar }">
+  <div class="avatar" :class="{ 'has-avatar': avatar }" :title="userKey">
     <img v-if="avatar" :src="avatar" alt="avatar" />
     <span v-else class="avatar-letter">{{ userKey.charAt(0) }}</span>
   </div>
@@ -22,6 +22,12 @@
     background-color: var(--purple-color);
     border: 1px solid var(--purple-color);
     margin: 5px;
+    cursor: pointer;
+    transition: transform 0.2s ease;
+  }
+
+  .avatar:hover {
+    transform: scale(1.1);
   }
 
   .avatar img {
