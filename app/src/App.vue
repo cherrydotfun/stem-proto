@@ -2,6 +2,9 @@
   <div>
     <div class="page-container">
       <div class="menu-container">
+        <div>
+          <button @click="printAccount">Print Account</button>
+        </div>
         <template v-if="!publicKey">
           <div class="auth-container">
             <button
@@ -90,12 +93,21 @@
 
   import { useWallet } from "./composables/wallet";
 
+  import { Connection } from "./utils/solana";
+
   const { wallet, names, selectWallet } = useWallet([
     useLocalWallet(rpcUrl),
     usePhantomWallet(rpcUrl),
   ]);
 
   const publicKey = computed(() => wallet.value?.publicKey || null);
+
+  const connection = new Connection(rpcUrl, "ws://localhost:8900", "finalized");
+  let account: Account | null = null;
+
+  const printAccount = () => {
+    console.log("Account", account.publicKey.toBase58(), account.balance);
+  };
 
   const _selectWallet = async (name: string) => {
     selectWallet(name);
@@ -108,6 +120,11 @@
       // new PublicKey("BjheWDpSQGu1VmY1MHQPzvyBZDWvAnfrnw55mHr33BRB")
       publicKey.value
     );
+
+    account = connection.getAccount(publicKey.value, true);
+    account.onUpdate((account) => {
+      console.log("Account updated", account.balance);
+    });
   };
 
   const copyKey = async () => {
