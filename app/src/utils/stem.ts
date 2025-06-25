@@ -23,7 +23,7 @@ export class Solana {
   static LAMPORTS_PER_SOL: number = LAMPORTS_PER_SOL;
 
   constructor(rpcUrl: string = "http://localhost:8899") {
-    this.connection = new Connection(rpcUrl, "confirmed");
+    this.connection = new Connection(rpcUrl, "finalized");
   }
 
   async getAccountInfo(publicKey: PublicKey) {
