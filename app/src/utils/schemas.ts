@@ -21,3 +21,29 @@ export const DescriptorSchema: Schema = {
     peers: { array: { type: PeerSchema } },
   },
 };
+
+export const MessageSchema: Schema = {
+  struct: {
+    sender: {
+      array: {
+        type: "u8",
+        len: 32,
+      },
+    },
+    content: "string",
+    timestamp: {
+      array: {
+        type: "u8",
+        len: 8,
+      },
+    },
+  },
+};
+
+export const ChatSchema: Schema = {
+  struct: {
+    wallets: { array: { type: PubkeySchema, len: 2 } },
+    length: "u32",
+    messages: { array: { type: MessageSchema } },
+  },
+};

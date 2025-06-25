@@ -94,6 +94,7 @@
   import { useWallet } from "./composables/wallet";
 
   import { Connection } from "./utils/solana";
+  import { Stem as StemLib } from "./utils/stem_lib";
 
   const { wallet, names, selectWallet } = useWallet([
     useLocalWallet(rpcUrl),
@@ -103,10 +104,15 @@
   const publicKey = computed(() => wallet.value?.publicKey || null);
 
   const connection = new Connection(rpcUrl, "ws://localhost:8900", "finalized");
-  let account: Account | null = null;
+  let stem: StemLib | null = null;
 
   const printAccount = () => {
-    console.log("Account", account.publicKey.toBase58(), account.balance);
+    console.log(
+      "STEM instance",
+      stem?.getChat(
+        new PublicKey("6tXNEN7bTNKkk3dYtYXr1ELBdAgogpvhZCQTZ6UAE1fi")
+      )
+    );
   };
 
   const _selectWallet = async (name: string) => {
@@ -116,15 +122,18 @@
     // solana.subscribeToProgram(
     //   new PublicKey("BjheWDpSQGu1VmY1MHQPzvyBZDWvAnfrnw55mHr33BRB")
     // );
-    solana.subscribeToLogs(
-      // new PublicKey("BjheWDpSQGu1VmY1MHQPzvyBZDWvAnfrnw55mHr33BRB")
-      publicKey.value
-    );
+    // solana.subscribeToLogs(
+    //   // new PublicKey("BjheWDpSQGu1VmY1MHQPzvyBZDWvAnfrnw55mHr33BRB")
+    //   publicKey.value
+    // );
 
-    account = connection.getAccount(publicKey.value, true);
-    account.onUpdate((account) => {
-      console.log("Account updated", account.balance);
-    });
+    // account = connection.getAccount(publicKey.value, true);
+    // account.onUpdate((account) => {
+    //   console.log("Account updated", account.balance);
+    // });
+
+    stem = new StemLib(publicKey.value, connection);
+    await stem.init();
   };
 
   const copyKey = async () => {
