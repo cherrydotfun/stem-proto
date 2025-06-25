@@ -1,9 +1,13 @@
 <template>
   <div class="menu" :class="{ 'collapsed': isCollapsed }">
+    <!-- User avatar always on top -->
+    <div class="user-avatar-collapsed" v-if="isCollapsed">
+      <AvatarComponent :userKey="userKey" />
+    </div>
     <div class="scrollable-content">
       <div class="chats-list">
         <div v-if="walletDescriptor.isRegistered">
-          <div class="section-title">Chats</div>
+          <div class="section-title" v-show="!isCollapsed">Chats</div>
           <div
             v-if="acceptedPeers.length"
             v-for="peer in acceptedPeers"
@@ -12,6 +16,7 @@
             :class="{
               'active-chat': currentChat?.toBase58() === peer.pubkey.toBase58(),
               'chat-item': true,
+              'chat-item-collapsed': isCollapsed
             }"
           >
             <AvatarComponent :userKey="peer.pubkey.toBase58()" />
@@ -28,8 +33,7 @@
       </div>
       <div
         class="invites-list"
-        v-if="walletDescriptor.isRegistered && requestedPeers.length"
-        v-show="!isCollapsed"
+        v-if="walletDescriptor.isRegistered && requestedPeers.length && !isCollapsed"
       >
         <div class="section-title">Chat Requests</div>
         <div
@@ -144,6 +148,23 @@
     flex-direction: column;
     flex: 1;
     overflow: hidden;
+    height: 100%;
+  }
+
+  .user-avatar-collapsed {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px 0 10px 0;
+  }
+
+  .chat-item-collapsed {
+    justify-content: center;
+    padding: 10px 0;
+  }
+
+  .chat-item-collapsed .peer-info {
+    display: none !important;
   }
 
   .scrollable-content {
@@ -249,8 +270,10 @@
   }
 
   .invite-form {
+    margin-top: auto;
     padding: 20px;
     border-top: 1px solid var(--purple-color);
+    background: var(--black-color);
     display: flex;
     flex-direction: column;
     gap: 10px;
