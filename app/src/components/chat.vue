@@ -67,4 +67,28 @@
   .my .message-timestamp-text {
     transform: skew(-20deg);
   }
+
+  .message-timestamp {
+    font-size: 12px;
+    color: #666;
+    margin-top: 5px;
+  }
+
+  /* Мобильные стили */
+  @media (max-width: 768px) {
+    .message {
+      margin-bottom: 15px;
+    }
+
+    .message-content {
+      padding: 12px 16px;
+      min-width: 60%;
+      max-width: 85%;
+    }
+
+    .message-timestamp {
+      font-size: 11px;
+      margin-top: 8px;
+    }
+  }
 </style>

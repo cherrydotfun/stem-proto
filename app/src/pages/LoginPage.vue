@@ -256,4 +256,77 @@ const props = defineProps<{
   color: #28a745;
   font-size: 16px;
 }
+
+/* Мобильные стили */
+@media (max-width: 768px) {
+  .login-container {
+    padding: 10px;
+  }
+
+  .login-card {
+    padding: 30px 20px;
+    border-radius: 15px;
+  }
+
+  .login-header h1 {
+    font-size: 2rem;
+  }
+
+  .login-header p {
+    font-size: 14px;
+  }
+
+  .wallet-selection h3 {
+    font-size: 18px;
+  }
+
+  .wallet-button {
+    padding: 18px 20px;
+    font-size: 16px;
+    gap: 15px;
+  }
+
+  .wallet-icon {
+    font-size: 24px;
+  }
+
+  .user-info {
+    margin: 20px 0;
+    padding: 15px;
+  }
+
+  .user-key {
+    font-size: 16px;
+    padding: 12px;
+  }
+
+  .user-balance {
+    font-size: 14px;
+  }
+
+  .registration {
+    margin-top: 20px;
+    padding: 15px;
+  }
+
+  .registration-actions {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .register-button, .airdrop-button {
+    padding: 15px 20px;
+    font-size: 16px;
+    width: 100%;
+  }
+
+  .success {
+    margin-top: 20px;
+    padding: 15px;
+  }
+
+  .success-message p {
+    font-size: 14px;
+  }
+}
 </style> 

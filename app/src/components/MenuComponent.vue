@@ -14,7 +14,7 @@
             :key="peer.pubkey.toBase58()"
             @click="openChat(peer.pubkey)"
             :class="{
-              'active-chat': currentChat?.toBase58() === peer.pubkey.toBase58(),
+              'active-chat': currentChat && currentChat.toBase58() === peer.pubkey.toBase58(),
               'chat-item': true,
               'chat-item-collapsed': isCollapsed
             }"
@@ -307,5 +307,80 @@
   }
   .menu.collapsed .chat-item {
     justify-content: center;
+  }
+
+  /* Мобильные стили */
+  @media (max-width: 768px) {
+    .menu {
+      padding: 10px;
+    }
+
+    .chats-list {
+      padding: 15px;
+    }
+
+    .chat-item {
+      padding: 15px;
+      gap: 20px;
+      margin-bottom: 10px;
+    }
+
+    .chat-item-collapsed {
+      padding: 15px 0;
+    }
+
+    .peer-info {
+      flex: 1;
+    }
+
+    .peer-key {
+      font-size: 16px;
+    }
+
+    .invite-item {
+      padding: 15px;
+      gap: 20px;
+      margin-bottom: 10px;
+    }
+
+    .invite-actions {
+      gap: 15px;
+    }
+
+    .accept-button,
+    .reject-button {
+      padding: 12px 20px;
+      font-size: 14px;
+      min-width: 80px;
+    }
+
+    .invite-form {
+      padding: 15px;
+      gap: 15px;
+    }
+
+    .invite-input {
+      padding: 15px;
+      font-size: 16px;
+    }
+
+    .invite-button {
+      padding: 15px 20px;
+      font-size: 16px;
+    }
+
+    .section-title {
+      font-size: 18px;
+      margin-bottom: 20px;
+    }
+
+    .no-chats {
+      font-size: 16px;
+      padding: 20px;
+    }
+
+    .user-avatar-collapsed {
+      padding: 30px 0 20px 0;
+    }
   }
 </style>

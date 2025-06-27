@@ -16,7 +16,6 @@
       :rejectPeer="rejectPeer"
       :sendMessage="sendMessage"
       :openChat="openChat"
-      :logout="logout"
       :toggleMenu="toggleMenu"
     />
   </router-view>
@@ -157,13 +156,6 @@
   
   const toggleMenu = () => {
     isMenuCollapsed.value = !isMenuCollapsed.value;
-  };
-
-  const logout = () => {
-    disconnect();
-    chatPeer.value = null;
-    message.value = "";
-    router.push('/');
   };
 
   // Автоматическое переключение между страницами

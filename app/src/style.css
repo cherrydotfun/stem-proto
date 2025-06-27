@@ -366,5 +366,42 @@ template {
  */
 
 [hidden] {
-  display: none;
+  display: none !important;
+}
+
+/* Мобильные стили */
+@media (max-width: 768px) {
+  :root {
+    font-size: 14px;
+  }
+
+  body {
+    overflow-x: hidden;
+  }
+
+  /* Улучшения для мобильных устройств */
+  input, button, textarea {
+    font-size: 16px !important; /* Предотвращает зум на iOS */
+  }
+
+  /* Улучшения для touch-устройств */
+  button, .chat-item, .invite-item {
+    min-height: 44px; /* Минимальная высота для touch */
+  }
+
+  /* Улучшения для скролла */
+  .scrollable-content {
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+/* Планшетные стили */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .page-container {
+    grid-template-columns: 200px 1fr;
+  }
+  
+  .page-container.menu-collapsed {
+    grid-template-columns: 60px 1fr;
+  }
 }
