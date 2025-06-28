@@ -107,12 +107,7 @@
   let stem: StemLib | null = null;
 
   const printAccount = () => {
-    console.log(
-      "STEM instance",
-      stem?.getChat(
-        new PublicKey("6tXNEN7bTNKkk3dYtYXr1ELBdAgogpvhZCQTZ6UAE1fi")
-      )
-    );
+    console.log("STEM instance", stem);
   };
 
   const _selectWallet = async (name: string) => {

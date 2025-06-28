@@ -1,4 +1,9 @@
-import { PublicKey } from "@solana/web3.js";
+import {
+  PublicKey,
+  Transaction,
+  TransactionInstruction,
+  SystemProgram,
+} from "@solana/web3.js";
 import { createHash } from "crypto";
 import * as borsh from "borsh";
 import { EventEmitter } from "events";
@@ -60,16 +65,22 @@ export class Stem {
   private _chatsAccounts: Map<string, PeerAccount>;
   private _isRegistered: boolean;
   private _isLoaded: boolean;
+  private _subscribe: boolean;
 
   private _emitter: EventEmitter = new EventEmitter();
 
-  constructor(publicKey: PublicKey, connection: Connection) {
+  constructor(
+    publicKey: PublicKey,
+    connection: Connection,
+    subscribe: boolean = false
+  ) {
     this._publicKey = publicKey;
     this._connection = connection;
+    this._subscribe = subscribe;
     this._descriptorAccount = new Account(
       helpers.getDescriptorPda(this._publicKey),
       this._connection.connection,
-      true
+      this._subscribe
     );
     this._chatsAccounts = new Map();
     this._isRegistered = false;
@@ -89,6 +100,10 @@ export class Stem {
 
   async _parseAndUpdatePeers() {
     console.log("Stem._parseAndUpdatePeers()");
+
+    if (!this._descriptorAccount || !this._descriptorAccount.data) {
+      this._isRegistered = false;
+    }
 
     const chats = borsh.deserialize(
       DescriptorSchema,
@@ -115,13 +130,20 @@ export class Stem {
         const account = new Account(
           helpers.getChatPda(this._publicKey, peerPubKey),
           this._connection.connection,
-          true
+          this._subscribe
         );
+        if (this._subscribe) {
+          account.onUpdate(() => {
+            console.log("STEM: Chat updated");
+          });
+        }
+
         account.fetch();
         this._chatsAccounts.set(peerPubKeyString, {
           account,
           status: peer.status,
         });
+
         updated = true;
       } else {
         const peerAccount = this._chatsAccounts.get(peerPubKeyString);
@@ -136,7 +158,8 @@ export class Stem {
     }
 
     if (updated) {
-      this._emitter.emit("onChatsUpdate", this._chatsAccounts);
+      console.log("STEM: Chat list updated");
+      this._emitter.emit("onChatsUpdated", this._chatsAccounts);
     }
 
     return updated;
@@ -146,7 +169,10 @@ export class Stem {
     // load descriptor account
     await this._descriptorAccount.fetch();
     await this._parseAndUpdatePeers();
-    this._descriptorAccount.onUpdate(this._parseAndUpdatePeers);
+
+    if (this._subscribe) {
+      this._descriptorAccount.onUpdate(this._parseAndUpdatePeers);
+    }
 
     // load chats accounts
 
@@ -183,14 +209,69 @@ export class Stem {
   }
 
   getChat(pubkey: PublicKey) {
+    if (!this._isLoaded) {
+      throw Error("Account is not loaded");
+    }
+    if (!this._isRegistered) {
+      throw Error("Account is not registered");
+    }
+
     const peerAccount = this._chatsAccounts.get(pubkey.toBase58());
+
+    if (!peerAccount) {
+      return null;
+    }
+
     return peerAccount?.account ? this._parseChat(peerAccount.account) : null;
   }
 
-  // async load() {
-  //   await this.loadPeers(); // this._descriptorAccount.onUpdate();
+  // Programm calls
+  // Register
+  // Invite
+  // Accept
+  // Reject
+  // send message
 
-  //   this._isLoaded = true;
-  //   return this;
-  // }
+  async genRegisterTx() {
+    if (!this._isLoaded) {
+      throw Error("Account is not loaded");
+    }
+
+    if (this._isRegistered) {
+      throw Error("Stem Account already registred");
+    }
+
+    const descriptorPda = helpers.getDescriptorPda(this._publicKey);
+
+    if (!descriptorPda) {
+      throw new Error("Descriptor PDA not generated");
+    }
+
+    const ix = new TransactionInstruction({
+      programId: PROGRAM_ID,
+      keys: [
+        {
+          pubkey: descriptorPda,
+          isSigner: false,
+          isWritable: true,
+        },
+        {
+          pubkey: this._publicKey,
+          isSigner: true,
+          isWritable: false,
+        },
+        {
+          pubkey: SystemProgram.programId,
+          isSigner: false,
+          isWritable: false,
+        },
+      ],
+      data: helpers.getdisc("register"),
+    });
+    // console.log(ix);
+
+    const tx = new Transaction().add(ix);
+
+    return tx;
+  }
 }
