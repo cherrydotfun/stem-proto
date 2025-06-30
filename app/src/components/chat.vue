@@ -25,7 +25,7 @@
 
   defineProps<{
     chat: any;
-    publicKey: PublicKey;
+    publicKey: PublicKey | null;
   }>();
 </script>
 <style scoped>

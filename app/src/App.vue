@@ -27,7 +27,6 @@
     getRawSolana,
     getAccountInfo,
     getWalletDescriptor,
-    getChatData,
   } from "./composables/stem";
   const rpcUrl = import.meta.env.VITE_RPC_URL || "http://localhost:8899";
   initSolana(rpcUrl);
@@ -42,7 +41,7 @@
 
   const router = useRouter();
 
-  const { wallet, names, selectWallet, disconnect } = useWallet([
+  const { wallet, names, selectWallet } = useWallet([
     useLocalWallet(rpcUrl),
     usePhantomWallet(rpcUrl),
   ]);
@@ -102,9 +101,15 @@
       } catch (error) {
         console.error("Invite error:", error);
         if (error instanceof Error && error.message.includes("0x1770")) {
-          alert("Этот пользователь уже был приглашен ранее. Вы можете принять или отклонить существующее приглашение.");
+          alert(
+            "Этот пользователь уже был приглашен ранее. Вы можете принять или отклонить существующее приглашение."
+          );
         } else {
-          alert(`Ошибка при отправке приглашения: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
+          alert(
+            `Ошибка при отправке приглашения: ${
+              error instanceof Error ? error.message : "Неизвестная ошибка"
+            }`
+          );
         }
       }
     }
@@ -116,7 +121,11 @@
         await Stem.reject(wallet.value, peer);
       } catch (error) {
         console.error("Reject error:", error);
-        alert(`Ошибка при отклонении приглашения: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
+        alert(
+          `Ошибка при отклонении приглашения: ${
+            error instanceof Error ? error.message : "Неизвестная ошибка"
+          }`
+        );
       }
     }
   };
@@ -127,24 +136,22 @@
         await Stem.accept(wallet.value, peer);
       } catch (error) {
         console.error("Accept error:", error);
-        alert(`Ошибка при принятии приглашения: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
+        alert(
+          `Ошибка при принятии приглашения: ${
+            error instanceof Error ? error.message : "Неизвестная ошибка"
+          }`
+        );
       }
     }
   };
 
   const chatPeer = ref<PublicKey | null>(null);
 
-  const chatData = getChatData(
-    publicKey,
-    computed(() => chatPeer.value)
-  );
-
   const openChat = (peer: PublicKey) => {
     chatPeer.value = peer;
     console.log("set current chat peer", peer.toBase58());
   };
 
-  const message = ref<string>("");
   const sendMessage = async (messageText: string) => {
     if (wallet.value?.publicKey && chatPeer.value) {
       await Stem.sendMessage(wallet.value, chatPeer.value, messageText);
@@ -153,7 +160,7 @@
 
   // Menu collapse state
   const isMenuCollapsed = ref(false);
-  
+
   const toggleMenu = () => {
     isMenuCollapsed.value = !isMenuCollapsed.value;
   };
@@ -161,12 +168,12 @@
   // Автоматическое переключение между страницами
   watch(publicKey, (val) => {
     if (val && walletDescriptor.value?.isRegistered) {
-      if (router.currentRoute.value.path !== '/chat') {
-        router.push('/chat');
+      if (router.currentRoute.value.path !== "/chat") {
+        router.push("/chat");
       }
     } else if (!val) {
-      if (router.currentRoute.value.path !== '/') {
-        router.push('/');
+      if (router.currentRoute.value.path !== "/") {
+        router.push("/");
       }
     }
   });
@@ -174,13 +181,13 @@
   // Следим за регистрацией
   watch(walletDescriptor, (descriptor) => {
     if (publicKey.value && descriptor?.isRegistered) {
-      if (router.currentRoute.value.path !== '/chat') {
-        router.push('/chat');
+      if (router.currentRoute.value.path !== "/chat") {
+        router.push("/chat");
       }
     }
   });
 </script>
 
 <style scoped>
-/* Глобальные стили можно добавить здесь */
+  /* Глобальные стили можно добавить здесь */
 </style>
