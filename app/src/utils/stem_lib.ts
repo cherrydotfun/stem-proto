@@ -14,7 +14,6 @@ import type { DescriptorBorsh, ChatBorsh } from "./types";
 import { PeerStatus } from "./types";
 
 import { PROGRAM_ID, SEED_DESCRIPTOR, SEED_PRIVATE_CHAT } from "./const";
-import { StemHelpers } from "./stem";
 
 export const helpers = {
   getdisc: (name: string) =>
@@ -149,7 +148,11 @@ export class Stem {
           );
           if (this._subscribe) {
             account.onUpdate(() => {
-              console.log("STEM: Chat updated");
+              console.log("STEM: Chat updated", account.data);
+              this._emitter.emit("onChatUpdated", {
+                pubkey: peerPubKey,
+                chat: this._parseChat(account),
+              });
             });
           }
 
