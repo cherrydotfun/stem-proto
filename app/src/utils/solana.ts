@@ -88,7 +88,10 @@ export class Account {
     }
 
     const accountInfo = await this._connection.getAccountInfo(this._publicKey);
-    return this._update(accountInfo);
+    this._update(accountInfo);
+    this._emitter?.emit("update", this);
+
+    return this;
   }
 
   onUpdate(callback: (account: Account) => void) {

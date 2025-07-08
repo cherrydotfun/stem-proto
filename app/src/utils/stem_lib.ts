@@ -14,6 +14,7 @@ import type { DescriptorBorsh, ChatBorsh } from "./types";
 import { PeerStatus } from "./types";
 
 import { PROGRAM_ID, SEED_DESCRIPTOR, SEED_PRIVATE_CHAT } from "./const";
+import { StemHelpers } from "./stem";
 
 export const helpers = {
   getdisc: (name: string) =>
@@ -91,6 +92,10 @@ export class Stem {
     this._parseAndUpdatePeers = this._parseAndUpdatePeers.bind(this);
   }
 
+  get isLoaded() {
+    return this._isLoaded;
+  }
+
   get isRegistered() {
     if (!this._isLoaded) {
       throw new Error("Peer is not loaded");
@@ -101,68 +106,83 @@ export class Stem {
   async _parseAndUpdatePeers() {
     console.log("Stem._parseAndUpdatePeers()");
 
-    if (!this._descriptorAccount || !this._descriptorAccount.data) {
+    let statusUpdated = false;
+    let chatListUpdated = false;
+
+    if (!this._descriptorAccount || !this._descriptorAccount.isInitialized) {
+      if (this._isRegistered) {
+        statusUpdated = true;
+      }
       this._isRegistered = false;
+    } else {
+      if (!this._isRegistered) {
+        statusUpdated = true;
+      }
+      this._isRegistered = true;
     }
 
-    const chats = borsh.deserialize(
-      DescriptorSchema,
-      this._descriptorAccount.data.subarray(8)
-    ) as DescriptorBorsh;
+    if (this._descriptorAccount.isInitialized) {
+      const chats = borsh.deserialize(
+        DescriptorSchema,
+        this._descriptorAccount.data.subarray(8)
+      ) as DescriptorBorsh;
 
-    let updated = false;
-
-    for (const peer of chats.peers) {
-      const peerPubKey = new PublicKey(peer.pubkey);
-      const peerPubKeyString = peerPubKey.toBase58();
-      const obj = this._chatsAccounts.get(peerPubKeyString);
-      // ??
-      if (!obj) {
-        this._chatsAccounts.set(peerPubKeyString, {
-          account: null,
-          status: peer.status,
-        });
-        updated = true;
-      }
-
-      // only accepted peer has chat account
-      if (peer.status === PeerStatus.Accepted && !obj?.account) {
-        const account = new Account(
-          helpers.getChatPda(this._publicKey, peerPubKey),
-          this._connection.connection,
-          this._subscribe
-        );
-        if (this._subscribe) {
-          account.onUpdate(() => {
-            console.log("STEM: Chat updated");
-          });
-        }
-
-        account.fetch();
-        this._chatsAccounts.set(peerPubKeyString, {
-          account,
-          status: peer.status,
-        });
-
-        updated = true;
-      } else {
-        const peerAccount = this._chatsAccounts.get(peerPubKeyString);
-        if (!peerAccount || peerAccount.status !== peer.status) {
+      for (const peer of chats.peers) {
+        const peerPubKey = new PublicKey(peer.pubkey);
+        const peerPubKeyString = peerPubKey.toBase58();
+        const obj = this._chatsAccounts.get(peerPubKeyString);
+        // ??
+        if (!obj) {
           this._chatsAccounts.set(peerPubKeyString, {
             account: null,
             status: peer.status,
           });
-          updated = true;
+          chatListUpdated = true;
+        }
+
+        // only accepted peer has chat account
+        if (peer.status === PeerStatus.Accepted && !obj?.account) {
+          const account = new Account(
+            helpers.getChatPda(this._publicKey, peerPubKey),
+            this._connection.connection,
+            this._subscribe
+          );
+          if (this._subscribe) {
+            account.onUpdate(() => {
+              console.log("STEM: Chat updated");
+            });
+          }
+
+          account.fetch();
+          this._chatsAccounts.set(peerPubKeyString, {
+            account,
+            status: peer.status,
+          });
+
+          chatListUpdated = true;
+        } else {
+          const peerAccount = this._chatsAccounts.get(peerPubKeyString);
+          if (!peerAccount || peerAccount.status !== peer.status) {
+            this._chatsAccounts.set(peerPubKeyString, {
+              account: null,
+              status: peer.status,
+            });
+            chatListUpdated = true;
+          }
         }
       }
     }
 
-    if (updated) {
+    if (chatListUpdated) {
       console.log("STEM: Chat list updated");
       this._emitter.emit("onChatsUpdated", this._chatsAccounts);
     }
+    if (statusUpdated) {
+      console.log("STEM: Status updated");
+      this._emitter.emit("onStatusUpdated", this._isRegistered);
+    }
 
-    return updated;
+    return chatListUpdated;
   }
 
   async init() {
@@ -181,12 +201,11 @@ export class Stem {
   }
 
   get chats() {
-    return Array.from(this._chatsAccounts.values()).map((peer) => {
+    return Array.from(this._chatsAccounts.keys()).map((pubKeyString) => {
+      const pubKey = new PublicKey(pubKeyString);
       return {
-        pubkey: peer.account
-          ? new PublicKey(peer.account.publicKey.toBuffer())
-          : null,
-        status: peer.status,
+        pubkey: pubKey,
+        status: this._chatsAccounts.get(pubKeyString)?.status,
       };
     });
   }
@@ -225,6 +244,10 @@ export class Stem {
     return peerAccount?.account ? this._parseChat(peerAccount.account) : null;
   }
 
+  on(event: string, callback: (...args: any[]) => void) {
+    this._emitter.on(event, callback);
+  }
+
   // Programm calls
   // Register
   // Invite
@@ -232,7 +255,7 @@ export class Stem {
   // Reject
   // send message
 
-  async genRegisterTx() {
+  async createRegisterTx() {
     if (!this._isLoaded) {
       throw Error("Account is not loaded");
     }
@@ -268,10 +291,243 @@ export class Stem {
       ],
       data: helpers.getdisc("register"),
     });
-    // console.log(ix);
 
     const tx = new Transaction().add(ix);
 
+    return tx;
+  }
+  async createInviteTx(invitee: PublicKey) {
+    if (!this._isLoaded) {
+      throw Error("Account is not loaded");
+    }
+
+    if (!this._isRegistered) {
+      throw Error("Stem Account not registred");
+    }
+
+    if (this._chatsAccounts.get(invitee.toBase58())?.status) {
+      throw Error("Peer already invited");
+    }
+
+    const inviterPda = helpers.getDescriptorPda(this._publicKey);
+    const inviteePda = helpers.getDescriptorPda(invitee);
+
+    if (!inviterPda || !inviteePda) {
+      throw new Error("Descriptor PDA not generated");
+    }
+    if (this._publicKey.toBase58() === invitee.toBase58()) {
+      throw new Error("You can't invite yourself");
+    }
+
+    const ix = new TransactionInstruction({
+      programId: PROGRAM_ID,
+      keys: [
+        {
+          pubkey: this._publicKey,
+          isSigner: true,
+          isWritable: false,
+        },
+        {
+          pubkey: invitee,
+          isSigner: false,
+          isWritable: false,
+        },
+        {
+          pubkey: inviterPda,
+          isSigner: false,
+          isWritable: true,
+        },
+        {
+          pubkey: inviteePda,
+          isSigner: false,
+          isWritable: true,
+        },
+        {
+          pubkey: SystemProgram.programId,
+          isSigner: false,
+          isWritable: false,
+        },
+      ],
+      data: helpers.getdisc("invite"),
+    });
+
+    const tx = new Transaction().add(ix);
+    return tx;
+  }
+  async createAcceptTx(invitee: PublicKey) {
+    if (!this._isLoaded) {
+      throw Error("Account is not loaded");
+    }
+
+    if (!this._isRegistered) {
+      throw Error("Stem Account not registred");
+    }
+
+    if (
+      this._chatsAccounts.get(invitee.toBase58())?.status !==
+      PeerStatus.Requested
+    ) {
+      throw Error("Peer not invited");
+    }
+
+    const inviterPda = helpers.getDescriptorPda(this._publicKey);
+    const inviteePda = helpers.getDescriptorPda(invitee);
+
+    if (!inviterPda || !inviteePda) {
+      throw new Error("Descriptor PDA not generated");
+    }
+
+    if (this._publicKey.toBase58() === invitee.toBase58()) {
+      throw new Error("You can't invite yourself");
+    }
+
+    const ix = new TransactionInstruction({
+      programId: PROGRAM_ID,
+      keys: [
+        {
+          pubkey: this._publicKey,
+          isSigner: true,
+          isWritable: false,
+        },
+        {
+          pubkey: invitee,
+          isSigner: false,
+          isWritable: false,
+        },
+        {
+          pubkey: inviterPda,
+          isSigner: false,
+          isWritable: true,
+        },
+        {
+          pubkey: inviteePda,
+          isSigner: false,
+          isWritable: true,
+        },
+        {
+          pubkey: helpers.getChatPda(this._publicKey, invitee),
+          isSigner: false,
+          isWritable: true,
+        },
+        {
+          pubkey: SystemProgram.programId,
+          isSigner: false,
+          isWritable: false,
+        },
+      ],
+      data: Buffer.concat([
+        Buffer.from(helpers.getdisc("accept")),
+        helpers.getChatHash(this._publicKey, invitee),
+      ]),
+    });
+
+    const tx = new Transaction().add(ix);
+    return tx;
+  }
+  async createRejectTx(invitee: PublicKey) {
+    if (!this._isLoaded) {
+      throw Error("Account is not loaded");
+    }
+
+    if (!this._isRegistered) {
+      throw Error("Stem Account not registred");
+    }
+
+    if (
+      this._chatsAccounts.get(invitee.toBase58())?.status !==
+      PeerStatus.Requested
+    ) {
+      throw Error("Peer not invited");
+    }
+
+    const inviterPda = helpers.getDescriptorPda(this._publicKey);
+    const inviteePda = helpers.getDescriptorPda(invitee);
+
+    if (!inviterPda || !inviteePda) {
+      throw new Error("Descriptor PDA not generated");
+    }
+
+    if (this._publicKey.toBase58() === invitee.toBase58()) {
+      throw new Error("You can't invite yourself");
+    }
+
+    const ix = new TransactionInstruction({
+      programId: PROGRAM_ID,
+      keys: [
+        {
+          pubkey: this._publicKey,
+          isSigner: true,
+          isWritable: false,
+        },
+        {
+          pubkey: invitee,
+          isSigner: false,
+          isWritable: false,
+        },
+        {
+          pubkey: inviterPda,
+          isSigner: false,
+          isWritable: true,
+        },
+        {
+          pubkey: inviteePda,
+          isSigner: false,
+          isWritable: true,
+        },
+      ],
+      data: helpers.getdisc("reject"),
+    });
+
+    const tx = new Transaction().add(ix);
+    return tx;
+  }
+  async createSendMessageTx(invitee: PublicKey, message: string) {
+    if (!this._isLoaded) {
+      throw Error("Account is not loaded");
+    }
+
+    if (!this._isRegistered) {
+      throw Error("Stem Account not registred");
+    }
+
+    if (
+      this._chatsAccounts.get(invitee.toBase58())?.status !==
+      PeerStatus.Accepted
+    ) {
+      throw Error("Peer not invited");
+    }
+
+    const buf = Buffer.alloc(4);
+    buf.writeUInt32LE(message.length, 0);
+
+    const ix = new TransactionInstruction({
+      programId: PROGRAM_ID,
+      keys: [
+        {
+          pubkey: this._publicKey,
+          isSigner: true,
+          isWritable: false,
+        },
+        {
+          pubkey: helpers.getChatPda(this._publicKey, invitee),
+          isSigner: false,
+          isWritable: true,
+        },
+        {
+          pubkey: SystemProgram.programId,
+          isSigner: false,
+          isWritable: false,
+        },
+      ],
+      data: Buffer.concat([
+        Buffer.from(helpers.getdisc("sendmessage")),
+        helpers.getChatHash(this._publicKey, invitee),
+        buf,
+        Buffer.from(message),
+      ]),
+    });
+
+    const tx = new Transaction().add(ix);
     return tx;
   }
 }

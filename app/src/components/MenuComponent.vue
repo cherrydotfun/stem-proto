@@ -1,35 +1,32 @@
 <template>
   <div class="menu">
     <div class="chats-list">
-      <div v-if="walletDescriptor.isRegistered">
-        <div class="section-title">Chats</div>
-        <div
-          v-if="acceptedPeers.length"
-          v-for="peer in acceptedPeers"
-          :key="peer.pubkey.toBase58()"
-          @click="openChat(peer.pubkey)"
-          :class="{
-            'active-chat': currentChat?.toBase58() === peer.pubkey.toBase58(),
-            'chat-item': true,
-          }"
-        >
-          <AvatarComponent :userKey="peer.pubkey.toBase58()" />
-          <div class="peer-info">
-            <div class="peer-key">
-              {{ peer.pubkey.toBase58().slice(0, 4) }}...{{
-                peer.pubkey.toBase58().slice(-4)
-              }}
-            </div>
-            <!-- <div class="peer-status">Active chat</div> -->
+      <div class="section-title">Chats</div>
+      <!-- <div>
+        <pre>{{ JSON.stringify(chats, null, 2) }}</pre>
+      </div> -->
+      <div
+        v-if="acceptedPeers.length"
+        v-for="peer in acceptedPeers"
+        :key="peer.pubkey.toBase58()"
+        @click="openChat(peer.pubkey)"
+        :class="{
+          'active-chat': currentChat?.toBase58() === peer.pubkey.toBase58(),
+          'chat-item': true,
+        }"
+      >
+        <AvatarComponent :userKey="peer.pubkey.toBase58()" />
+        <div class="peer-info">
+          <div class="peer-key">
+            {{ peer.pubkey.toBase58().slice(0, 4) }}...{{
+              peer.pubkey.toBase58().slice(-4)
+            }}
           </div>
         </div>
-        <div v-else class="no-chats">No chats yet</div>
       </div>
+      <div v-else class="no-chats">No chats yet</div>
     </div>
-    <div
-      class="invites-list"
-      v-if="walletDescriptor.isRegistered && requestedPeers.length"
-    >
+    <div class="invites-list" v-if="requestedPeers.length">
       <div class="section-title">Chat Requests</div>
       <div
         v-for="peer in requestedPeers"
@@ -69,24 +66,28 @@
 <script setup lang="ts">
   import { computed, ref } from "vue";
   import { PublicKey } from "@solana/web3.js";
-  import { getWalletDescriptor } from "../composables/stem";
-  import { PeerState } from "../utils/stem";
+
+  import { PeerStatus } from "../utils/types";
 
   import AvatarComponent from "./UI/AvatarComponent.vue";
 
   interface MenuComponentProps {
     userKey: string;
+    chats: {
+      pubkey: PublicKey;
+      status: PeerStatus;
+    }[];
     currentChat: PublicKey | null;
   }
 
-  interface Peer {
-    pubkey: PublicKey;
-    status: number;
-  }
+  // interface Peer {
+  //   pubkey: PublicKey;
+  //   status: number;
+  // }
 
-  interface WalletDescriptorData {
-    peers: Peer[];
-  }
+  // interface WalletDescriptorData {
+  //   peers: Peer[];
+  // }
 
   const props = defineProps<MenuComponentProps>();
 
@@ -97,20 +98,17 @@
     (e: "rejectPeer", peer: PublicKey): void;
   }>();
 
-  const publicKey = computed(() => new PublicKey(props.userKey));
-  const walletDescriptor = getWalletDescriptor(publicKey);
+  // const publicKey = computed(() => new PublicKey(props.userKey));
   const invitee = ref<string>("");
 
   const acceptedPeers = computed(() => {
-    const data = walletDescriptor.value.data as WalletDescriptorData | null;
-    if (!data?.peers) return [];
-    return data.peers.filter((peer) => peer.status === PeerState.Accepted);
+    if (!props.chats) return [];
+    return props.chats.filter((peer) => peer.status === PeerStatus.Accepted);
   });
 
   const requestedPeers = computed(() => {
-    const data = walletDescriptor.value.data as WalletDescriptorData | null;
-    if (!data?.peers) return [];
-    return data.peers.filter((peer) => peer.status === PeerState.Requested);
+    if (!props.chats) return [];
+    return props.chats.filter((peer) => peer.status === PeerStatus.Requested);
   });
 
   const openChat = (peer: PublicKey) => {

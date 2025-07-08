@@ -55,6 +55,7 @@ export const useLocalWallet = (rpcUrl: string = "http://localhost:8899") => {
     console.log("Signing transaction", keypair.value.publicKey.toBase58());
 
     const signature = await connection.sendTransaction(tx, [keypair.value]);
+    console.log("Transaction sent", signature);
     return signature;
   };
 

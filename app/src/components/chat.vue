@@ -1,7 +1,7 @@
 <template>
-  <div v-if="chat" class="chat">
+  <div v-if="messages && messages.length" class="chat">
     <div
-      v-for="message in chat.messages"
+      v-for="message in messages"
       :key="message.timestamp"
       :class="{ message: true, my: message.sender.equals(publicKey) }"
     >
@@ -24,7 +24,7 @@
   import { PublicKey } from "@solana/web3.js";
 
   defineProps<{
-    chat: any;
+    messages: any[];
     publicKey: PublicKey;
   }>();
 </script>

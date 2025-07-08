@@ -2,6 +2,9 @@
   <div>
     <div class="page-container">
       <div class="menu-container">
+        <div>
+          <button @click="printAccount">Print Account</button>
+        </div>
         <template v-if="!publicKey">
           <div class="auth-container">
             <button
@@ -23,31 +26,30 @@
                 }}
               </div>
               <div class="user-balance">
-                {{ myAccount.balance }}
+                {{
+                  (myAccountInfo.accountInfo?.lamports || 0) / LAMPORTS_PER_SOL
+                }}
                 SOL
-              </div>
-              <div>
-                <button @click="requestAirdrop">Request Airdrop</button>
               </div>
             </div>
           </div>
         </template>
-        <template v-if="publicKey && !stem.isRegistered">
+        <template v-if="publicKey && !walletDescriptor.isRegistered">
           <div class="auth-container">
             <div>Account is not registered in Cherry chat.</div>
-
             <button @click="register">Register</button>
+
+            <button @click="requestAirdrop">Request Airdrop</button>
           </div>
         </template>
-        <template v-if="publicKey && stem.isRegistered">
+        <template v-if="publicKey && walletDescriptor.isRegistered">
           <MenuComponent
-            :currentChat="chatPeer"
-            :chats="stem.chats"
             :userKey="publicKey?.toBase58() || ''"
+            :currentChat="chatPeer"
+            @openChat="openChat"
             @invite="invite"
             @acceptPeer="acceptPeer"
             @rejectPeer="rejectPeer"
-            @openChat="openChat"
           />
         </template>
       </div>
@@ -59,7 +61,7 @@
             }}
           </div>
           <div class="chat-messages">
-            <chat :messages="chat.messages" :publicKey="publicKey" />
+            <chat :chat="chatData" :publicKey="publicKey" />
           </div>
           <div class="chat-input">
             <input type="text" v-model="message" />
@@ -74,32 +76,25 @@
   </div>
 </template>
 <script setup lang="ts">
-  import AvatarComponent from "./components/UI/AvatarComponent.vue";
-  import { PublicKey } from "@solana/web3.js";
-  import { useStem } from "./composables/stem";
-
-  import { computed, ref } from "vue";
-
+  import {
+    initSolana,
+    getRawSolana,
+    getAccountInfo,
+    getWalletDescriptor,
+    getChatData,
+  } from "./composables/stem";
   const rpcUrl = import.meta.env.VITE_RPC_URL || "http://localhost:8899";
-  // initSolana(rpcUrl);
+  initSolana(rpcUrl);
 
-  // import AvatarComponent from "./components/UI/AvatarComponent.vue";
+  import AvatarComponent from "./components/UI/AvatarComponent.vue";
 
   import { useLocalWallet } from "./composables/localWallet";
   import { usePhantomWallet } from "./composables/phantomWallet";
 
   import { useWallet } from "./composables/wallet";
 
-  import { getConnection, useAccount } from "./composables/solana";
-
-  const connection = getConnection({
-    rpcUrl: rpcUrl,
-    wsEndpoint: "ws://localhost:8900",
-    commitment: "finalized",
-  });
-
-  // import { Connection } from "./utils/solana";
-  // import { Stem as StemLib } from "./utils/stem_lib";
+  import { Connection } from "./utils/solana";
+  import { Stem as StemLib } from "./utils/stem_lib";
 
   const { wallet, names, selectWallet } = useWallet([
     useLocalWallet(rpcUrl),
@@ -108,17 +103,12 @@
 
   const publicKey = computed(() => wallet.value?.publicKey || null);
 
-  const myAccount = useAccount(
-    computed(() => publicKey.value),
-    connection
-  );
+  const connection = new Connection(rpcUrl, "ws://localhost:8900", "finalized");
+  let stem: StemLib | null = null;
 
-  // const connection = new Connection(rpcUrl, "ws://localhost:8900", "finalized");
-  // let stem: StemLib | null = null;
-
-  // const printAccount = () => {
-  //   console.log("STEM instance", stem);
-  // };
+  const printAccount = () => {
+    console.log("STEM instance", stem);
+  };
 
   const _selectWallet = async (name: string) => {
     selectWallet(name);
@@ -137,8 +127,8 @@
     //   console.log("Account updated", account.balance);
     // });
 
-    // stem = new StemLib(publicKey.value, connection);
-    // await stem.init();
+    stem = new StemLib(publicKey.value, connection);
+    await stem.init();
   };
 
   const copyKey = async () => {
@@ -151,22 +141,26 @@
     }
   };
 
-  // // import { Stem } from "~/utils/stem";
-  // import { PublicKey, LAMPORTS_PER_SOL } from "@solana/web3.js";
+  // import { Stem } from "~/utils/stem";
+  import { PublicKey, LAMPORTS_PER_SOL } from "@solana/web3.js";
 
-  // import { Stem } from "./utils/stem";
-  // import { ref, computed } from "vue";
+  import { Stem } from "./utils/stem";
+  import { ref, computed } from "vue";
   import Chat from "./components/chat.vue";
   import MenuComponent from "./components/MenuComponent.vue";
-  // const solana = getRawSolana();
+  const solana = getRawSolana();
 
-  // const myAccountInfo = getAccountInfo(publicKey);
+  const myAccountInfo = getAccountInfo(publicKey);
 
   const requestAirdrop = async () => {
     console.log("Requesting airdrop");
-    if (publicKey.value && myAccount && myAccount.raw) {
+    if (publicKey.value) {
       try {
-        await connection.requestAirdrop(myAccount.raw, 1);
+        const signature = await solana.connection.requestAirdrop(
+          publicKey.value,
+          LAMPORTS_PER_SOL
+        );
+        await solana.connection.confirmTransaction(signature);
         console.log("Airdrop successful");
       } catch (error) {
         console.error("Airdrop failed:", error);
@@ -177,48 +171,37 @@
     }
   };
 
-  const { stem, useChat } = useStem(connection, publicKey);
+  const walletDescriptor = getWalletDescriptor(publicKey);
 
-  // const walletDescriptor = getWalletDescriptor(publicKey);
-  // let stem: any = null;
-  const register = async () => {
-    if (wallet.value.publicKey && stem.raw) {
-      const tx = await stem.raw.createRegisterTx();
-      await wallet.value.signTransaction(tx);
-      console.log("Register TX sent");
+  const register = () => {
+    if (wallet.value.publicKey) {
+      Stem.register(wallet.value);
     }
   };
 
-  const invite = async (invitee: string) => {
+  const invite = (invitee: string) => {
     const inviteePubkey = new PublicKey(invitee);
-    if (wallet.value.publicKey && inviteePubkey && stem.raw) {
-      const tx = await stem.raw.createInviteTx(inviteePubkey);
-      await wallet.value.signTransaction(tx);
-      console.log("Invite TX sent");
+    if (wallet.value.publicKey && inviteePubkey) {
+      Stem.invite(wallet.value, inviteePubkey);
     }
   };
-  const rejectPeer = async (peer: PublicKey) => {
-    if (wallet.value.publicKey && peer && stem.raw) {
-      const tx = await stem.raw.createRejectTx(peer);
-      await wallet.value.signTransaction(tx);
-      console.log("Reject TX sent");
+  const rejectPeer = (peer: PublicKey) => {
+    if (wallet.value.publicKey && peer) {
+      Stem.reject(wallet.value, peer);
     }
   };
-  const acceptPeer = async (peer: PublicKey) => {
-    if (wallet.value.publicKey && peer && stem.raw) {
-      const tx = await stem.raw.createAcceptTx(peer);
-      await wallet.value.signTransaction(tx);
-      console.log("Accept TX sent");
+  const acceptPeer = (peer: PublicKey) => {
+    if (wallet.value.publicKey && peer) {
+      Stem.accept(wallet.value, peer);
     }
   };
 
   const chatPeer = ref<PublicKey | null>(null);
 
-  const chat = useChat(computed(() => chatPeer.value));
-  // const chatData = getChatData(
-  //   publicKey,
-  //   computed(() => chatPeer.value)
-  // );
+  const chatData = getChatData(
+    publicKey,
+    computed(() => chatPeer.value)
+  );
 
   const openChat = (peer: PublicKey) => {
     chatPeer.value = peer;
@@ -227,13 +210,9 @@
 
   const message = ref<string>("");
   const sendMessage = async () => {
-    if (wallet.value.publicKey && chatPeer.value && message.value && stem.raw) {
-      const tx = await stem.raw.createSendMessageTx(
-        chatPeer.value,
-        message.value
-      );
-      await wallet.value.signTransaction(tx);
-      console.log("Send message TX sent");
+    if (wallet.value.publicKey && chatPeer.value) {
+      await Stem.sendMessage(wallet.value, chatPeer.value, message.value);
+      message.value = "";
     }
   };
 </script>
@@ -289,7 +268,7 @@
     color: var(--white-color);
   }
 
-  button {
+  .chat-input button {
     padding: 10px 20px;
     border-radius: 5px;
     background-color: var(--purple-color);

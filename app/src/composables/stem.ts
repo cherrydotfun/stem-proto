@@ -1,43 +1,81 @@
-// import { Solana, StemHelpers, Stem } from "../utils/stem";
-// import { type AccountInfo, PublicKey } from "@solana/web3.js";
-// import { ref, type ComputedRef, watchEffect, computed } from "vue";
-
-import type { Commitment, PublicKey } from "@solana/web3.js";
-
+import { PublicKey } from "@solana/web3.js";
+import { reactive, watchEffect } from "vue";
+import type { ComputedRef } from "vue";
+import { Stem } from "../utils/stem_lib";
+import { PeerStatus } from "../utils/types";
 import { Connection } from "../utils/solana";
 
-type State = {
-  _connections: Record<string, Connection>;
-};
+export const useStem = (
+  connection: Connection,
+  publicKey: ComputedRef<PublicKey | null>
+) => {
+  let stem: Stem | null = null;
 
-const state: State = {
-  _connections: {},
-};
+  const retData = reactive({
+    isRegistered: false,
+    isLoaded: false,
+    chats: [] as
+      | {
+          pubkey: PublicKey | null;
+          status: PeerStatus;
+        }[]
+      | undefined,
+    raw: null as Stem | null,
+  });
 
-// Connection params or exists connetion id
-type useConnectionParams =
-  | {
-      rpcUrl: string;
-      wsEndpoint: string;
-      commitment: Commitment;
+  watchEffect(async () => {
+    console.log("Stem watchEffect", publicKey.value);
+    if (!publicKey.value) {
+      retData.isRegistered = false;
+      retData.isLoaded = false;
+      retData.chats = [];
+      retData.raw = null;
+      return;
     }
-  | string;
 
-export const getConnection = (params: useConnectionParams = "_default") => {
-  if (typeof params == "string") {
-    return state._connections[params];
-  }
+    stem = new Stem(publicKey.value, connection, true);
+    stem.on("onChatsUpdated", () => {
+      retData.chats = stem?.chats;
+    });
+    stem.on("onStatusUpdated", (isRegistered) => {
+      retData.isRegistered = isRegistered;
+    });
+    // stem.on("onLoaded", () => {
+    //   retData.isLoaded = true;
+    // });
+    await stem.init();
+    console.log("Stem isLoaded", stem.isLoaded);
+    retData.isLoaded = stem.isLoaded;
+    retData.raw = stem;
+  });
 
-  state._connections["_default"] = new Connection(
-    params.rpcUrl,
-    params.wsEndpoint,
-    params.commitment
-  );
+  const useChat = (chatPeer: ComputedRef<PublicKey | null>) => {
+    const chat = reactive({
+      messages: [] as any[],
+      peer: chatPeer.value,
+    });
 
-  return state._connections["_default"];
+    watchEffect(async () => {
+      if (!chatPeer.value) {
+        chat.messages = [];
+        chat.peer = null;
+        return;
+      }
+      if (stem) {
+        const tmp = stem.getChat(chatPeer.value);
+        console.log(tmp);
+        if (tmp) {
+          chat.messages = tmp.messages;
+          chat.peer = chatPeer.value;
+        }
+      }
+    });
+
+    return chat;
+  };
+
+  return { stem: retData, useChat };
 };
-
-export const useStem = (connection: Connection, publicKey: PublicKey) => {};
 
 // let solana = new Solana();
 
