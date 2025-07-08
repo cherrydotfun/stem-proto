@@ -8,18 +8,18 @@
       <div
         v-if="acceptedPeers.length"
         v-for="peer in acceptedPeers"
-        :key="peer.pubkey.toBase58()"
+        :key="peer.pubkey?.toBase58()"
         @click="openChat(peer.pubkey)"
         :class="{
-          'active-chat': currentChat?.toBase58() === peer.pubkey.toBase58(),
+          'active-chat': currentChat?.toBase58() === peer.pubkey?.toBase58(),
           'chat-item': true,
         }"
       >
-        <AvatarComponent :userKey="peer.pubkey.toBase58()" />
+        <AvatarComponent :userKey="peer.pubkey?.toBase58()" />
         <div class="peer-info">
           <div class="peer-key">
-            {{ peer.pubkey.toBase58().slice(0, 4) }}...{{
-              peer.pubkey.toBase58().slice(-4)
+            {{ peer.pubkey?.toBase58().slice(0, 4) }}...{{
+              peer.pubkey?.toBase58().slice(-4)
             }}
           </div>
         </div>
@@ -30,14 +30,14 @@
       <div class="section-title">Chat Requests</div>
       <div
         v-for="peer in requestedPeers"
-        :key="peer.pubkey.toBase58()"
+        :key="peer.pubkey?.toBase58()"
         class="invite-item"
       >
-        <AvatarComponent :userKey="peer.pubkey.toBase58()" />
+        <AvatarComponent :userKey="peer.pubkey?.toBase58() || ''" />
         <div class="peer-info">
           <div class="peer-key">
-            {{ peer.pubkey.toBase58().slice(0, 4) }}...{{
-              peer.pubkey.toBase58().slice(-4)
+            {{ peer.pubkey?.toBase58().slice(0, 4) }}...{{
+              peer.pubkey?.toBase58().slice(-4)
             }}
           </div>
           <div class="invite-actions">
@@ -73,21 +73,14 @@
 
   interface MenuComponentProps {
     userKey: string;
-    chats: {
-      pubkey: PublicKey;
-      status: PeerStatus;
-    }[];
+    chats:
+      | {
+          pubkey: PublicKey | null;
+          status: PeerStatus | undefined;
+        }[]
+      | undefined;
     currentChat: PublicKey | null;
   }
-
-  // interface Peer {
-  //   pubkey: PublicKey;
-  //   status: number;
-  // }
-
-  // interface WalletDescriptorData {
-  //   peers: Peer[];
-  // }
 
   const props = defineProps<MenuComponentProps>();
 
@@ -111,7 +104,8 @@
     return props.chats.filter((peer) => peer.status === PeerStatus.Requested);
   });
 
-  const openChat = (peer: PublicKey) => {
+  const openChat = (peer: PublicKey | null) => {
+    if (!peer) return;
     emit("openChat", peer);
   };
 
@@ -122,11 +116,13 @@
     }
   };
 
-  const acceptPeer = (peer: PublicKey) => {
+  const acceptPeer = (peer: PublicKey | null) => {
+    if (!peer) return;
     emit("acceptPeer", peer);
   };
 
-  const rejectPeer = (peer: PublicKey) => {
+  const rejectPeer = (peer: PublicKey | null) => {
+    if (!peer) return;
     emit("rejectPeer", peer);
   };
 </script>

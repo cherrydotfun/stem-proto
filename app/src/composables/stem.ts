@@ -1,7 +1,7 @@
 import { PublicKey } from "@solana/web3.js";
 import { reactive, watchEffect } from "vue";
 import type { ComputedRef } from "vue";
-import { Stem } from "../utils/stem_lib";
+import { Stem } from "../utils/stem";
 import { PeerStatus } from "../utils/types";
 import { Connection } from "../utils/solana";
 
@@ -17,7 +17,7 @@ export const useStem = (
     chats: [] as
       | {
           pubkey: PublicKey | null;
-          status: PeerStatus;
+          status: PeerStatus | undefined;
         }[]
       | undefined,
     raw: null as Stem | null,

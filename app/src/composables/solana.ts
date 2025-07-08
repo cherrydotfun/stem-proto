@@ -1,12 +1,5 @@
 import type { Commitment, PublicKey } from "@solana/web3.js";
-import {
-  ref,
-  watchEffect,
-  type ComputedRef,
-  type Ref,
-  computed,
-  reactive,
-} from "vue";
+import { watchEffect, type ComputedRef, type Ref, reactive } from "vue";
 
 import { Connection, Account } from "../utils/solana";
 

@@ -77,6 +77,7 @@
   import AvatarComponent from "./components/UI/AvatarComponent.vue";
   import { PublicKey } from "@solana/web3.js";
   import { useStem } from "./composables/stem";
+  import { Account } from "./utils/solana";
 
   import { computed, ref } from "vue";
 
@@ -97,9 +98,6 @@
     wsEndpoint: "ws://localhost:8900",
     commitment: "finalized",
   });
-
-  // import { Connection } from "./utils/solana";
-  // import { Stem as StemLib } from "./utils/stem_lib";
 
   const { wallet, names, selectWallet } = useWallet([
     useLocalWallet(rpcUrl),
@@ -151,22 +149,14 @@
     }
   };
 
-  // // import { Stem } from "~/utils/stem";
-  // import { PublicKey, LAMPORTS_PER_SOL } from "@solana/web3.js";
-
-  // import { Stem } from "./utils/stem";
-  // import { ref, computed } from "vue";
   import Chat from "./components/chat.vue";
   import MenuComponent from "./components/MenuComponent.vue";
-  // const solana = getRawSolana();
-
-  // const myAccountInfo = getAccountInfo(publicKey);
 
   const requestAirdrop = async () => {
     console.log("Requesting airdrop");
     if (publicKey.value && myAccount && myAccount.raw) {
       try {
-        await connection.requestAirdrop(myAccount.raw, 1);
+        await connection.requestAirdrop(myAccount.raw as Account, 1);
         console.log("Airdrop successful");
       } catch (error) {
         console.error("Airdrop failed:", error);
@@ -179,8 +169,6 @@
 
   const { stem, useChat } = useStem(connection, publicKey);
 
-  // const walletDescriptor = getWalletDescriptor(publicKey);
-  // let stem: any = null;
   const register = async () => {
     if (wallet.value.publicKey && stem.raw) {
       const tx = await stem.raw.createRegisterTx();
@@ -215,10 +203,6 @@
   const chatPeer = ref<PublicKey | null>(null);
 
   const chat = useChat(computed(() => chatPeer.value));
-  // const chatData = getChatData(
-  //   publicKey,
-  //   computed(() => chatPeer.value)
-  // );
 
   const openChat = (peer: PublicKey) => {
     chatPeer.value = peer;
