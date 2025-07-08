@@ -218,14 +218,16 @@ export class Stem {
       ChatSchema,
       account.data.subarray(8)
     ) as ChatBorsh;
-
+    // debugger;
     return {
       wallets: chat.wallets.map((wallet) => new PublicKey(wallet)),
       length: chat.length,
       messages: chat.messages.map((message) => ({
         sender: new PublicKey(message.sender),
         content: message.content,
-        timestamp: new Date(Number(message.timestamp)),
+        timestamp: new Date(
+          Buffer.from(message.timestamp.slice(0, 4)).readUint32LE() * 1000
+        ),
       })),
     };
   }
