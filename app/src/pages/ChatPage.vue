@@ -7,32 +7,32 @@
         'mobile-menu-open': !isMenuCollapsed && isMobile,
       }"
     >
-      <!-- Боковое меню -->
+      <!-- Side menu -->
+
       <div class="menu-container" :class="{ 'mobile-menu': isMobile }">
         <div class="menu-toggle" @click="toggleMenu">
           <span v-if="isMenuCollapsed">☰</span>
           <span v-else>✕</span>
         </div>
-
-        <!-- Информация о пользователе -->
+        <!-- User info -->
         <div class="user-info" v-show="!isMenuCollapsed">
           <AvatarComponent :userKey="publicKey?.toBase58() || ''" />
           <div class="user-details">
-            <div class="user-key" @click="copyKey" :title="'Click to copy'">
+            <div class="user-key" @click="copyKey(publicKey as PublicKey)" :title="'Click to copy'">
               {{ publicKey?.toBase58().slice(0, 4) }}...{{
                 publicKey?.toBase58().slice(-4)
               }}
             </div>
             <div class="user-balance">
               {{
-                (myAccountInfo.accountInfo?.lamports || 0) / LAMPORTS_PER_SOL
+                myAccount.balance
               }}
               SOL
             </div>
           </div>
         </div>
 
-        <!-- Свернутое состояние с аватарами -->
+        <!-- Collapsed state with avatars -->
         <div class="collapsed-menu" v-show="isMenuCollapsed">
           <div class="user-avatar-collapsed">
             <AvatarComponent :userKey="publicKey?.toBase58() || ''" />
@@ -59,12 +59,13 @@
           </div>
         </div>
 
-        <!-- Меню чатов и контактов -->
+        <!-- Chat menu and contacts -->
         <div class="menu-content" v-show="!isMenuCollapsed">
           <MenuComponent
             :userKey="publicKey?.toBase58() || ''"
             :currentChat="chatPeer || null"
             :isCollapsed="isMenuCollapsed"
+            :chats="stem.chats"
             @openChat="handleOpenChat"
             @invite="invite"
             @acceptPeer="acceptPeer"
@@ -73,7 +74,7 @@
         </div>
       </div>
 
-      <!-- Основная область чата -->
+      <!-- Main chat area -->
       <div class="chat-container">
         <div v-if="chatPeer" class="chat-container-inner">
           <div class="chat-header">
@@ -97,7 +98,7 @@
           </div>
 
           <div class="chat-messages">
-            <chat :chat="chatData" :publicKey="publicKey" />
+            <chat :messages="chat.messages" :publicKey="publicKey as PublicKey" />
           </div>
 
           <div class="chat-input">
@@ -131,7 +132,7 @@
         </div>
       </div>
 
-      <!-- Мобильное затемнение -->
+      <!-- Mobile overlay -->
       <div
         v-if="isMobile && !isMenuCollapsed"
         class="mobile-overlay"
@@ -142,45 +143,38 @@
 </template>
 
 <script setup lang="ts">
-  import type { PublicKey } from "@solana/web3.js";
-  import { ref, computed, watch, onMounted, onUnmounted } from "vue";
-  import { LAMPORTS_PER_SOL } from "@solana/web3.js";
-  import { getChatData, getWalletDescriptor } from "../composables/stem";
-  import { PeerState } from "../utils/stem";
+  import { PublicKey } from "@solana/web3.js";
+  import { ref, computed, onMounted, onUnmounted } from "vue";
+  import { PeerStatus } from "../utils/types";
   import AvatarComponent from "../components/UI/AvatarComponent.vue";
   import MenuComponent from "../components/MenuComponent.vue";
-  import Chat from "../components/chat.vue";
+  import Chat from "../components/chat.vue";  
+  import { copyKey } from "../utils/helpers";
 
   const props = defineProps<{
     publicKey: PublicKey | null;
-    myAccountInfo: any;
-    isMenuCollapsed: boolean;
-    invite: (invitee: string) => void;
-    acceptPeer: (peer: PublicKey) => void;
-    rejectPeer: (peer: PublicKey) => void;
-    sendMessage: (message: string) => void;
-    openChat: (peer: PublicKey) => void;
-    copyKey: () => void;
-    toggleMenu: () => void;
+    myAccount: any;
+    stem: any;
+    wallet: any;
+    useChat: any;
   }>();
 
-  const chatPeer = ref<PublicKey | null>(null);
-  const chatData = ref<any>(null);
   const isMobile = ref(false);
 
-  // Получаем данные кошелька для acceptedPeers
-  const walletDescriptor = computed(() => {
-    if (!props.publicKey) return null;
-    return getWalletDescriptor(computed(() => props.publicKey!));
-  });
+  // Menu collapse state
+  const isMenuCollapsed = ref(false);
+
+  const toggleMenu = () => {
+    isMenuCollapsed.value = !isMenuCollapsed.value;
+  };
 
   const acceptedPeers = computed(() => {
-    const data = walletDescriptor.value?.value?.data;
-    if (!data?.peers) return [];
-    return data.peers.filter((peer: any) => peer.status === PeerState.Accepted);
+    if (!props.stem || !props.stem.chats) return [];
+    return props.stem.chats.filter((peer: any) => peer.status === PeerStatus.Accepted);
   });
 
-  // Определяем мобильное устройство
+  // Check if the device is mobile
+
   const checkMobile = () => {
     isMobile.value = window.innerWidth <= 768;
   };
@@ -194,53 +188,53 @@
     window.removeEventListener("resize", checkMobile);
   });
 
-  const updateChatData = () => {
-    console.log(
-      "updateChatData called, publicKey:",
-      props.publicKey?.toBase58(),
-      "chatPeer:",
-      chatPeer.value?.toBase58()
-    );
-    if (props.publicKey && chatPeer.value) {
-      const data = getChatData(
-        computed(() => props.publicKey),
-        computed(() => chatPeer.value!)
-      );
-      chatData.value = data.value;
-      console.log("chatData updated:", chatData.value);
-    } else {
-      chatData.value = null;
-      console.log("chatData set to null");
+  const invite = async (invitee: string) => {
+    const inviteePubkey = new PublicKey(invitee);
+    if (props.wallet.publicKey && inviteePubkey && props.stem.raw) {
+      const tx = await props.stem.raw.createInviteTx(inviteePubkey);
+      await props.wallet.signTransaction(tx);
+      console.log("Invite TX sent");
     }
   };
 
-  // Обновляем chatData при изменении chatPeer
-  watch(chatPeer, updateChatData);
-  watch(() => props.publicKey, updateChatData);
+  const rejectPeer = async (peer: PublicKey) => {
+    if (props.wallet.publicKey && peer && props.stem.raw) {
+      const tx = await props.stem.raw.createRejectTx(peer);
+      await props.wallet.signTransaction(tx);
+      console.log("Reject TX sent");
+    }
+  };
+  const acceptPeer = async (peer: PublicKey) => {
+    if (props.wallet.publicKey && peer && props.stem.raw) {
+      const tx = await props.stem.raw.createAcceptTx(peer);
+      await props.wallet.signTransaction(tx);
+      console.log("Accept TX sent");
+    }
+  };
+
+  const chatPeer = ref<PublicKey | null>(null);
+
+  const chat = props.useChat(computed(() => chatPeer.value));
 
   const message = ref<string>("");
 
-  const handleSendMessage = () => {
+  const handleSendMessage = async () => {
     if (message.value.trim() && chatPeer.value) {
-      props.sendMessage(message.value);
+      const tx = await props.stem.raw.createSendMessageTx(chatPeer.value, message.value);
+      await props.wallet.signTransaction(tx);
+      console.log("Send message TX sent");
       message.value = "";
-      // Обновляем данные чата после отправки сообщения
-      setTimeout(() => {
-        updateChatData();
-      }, 1000); // Небольшая задержка для обновления блокчейна
+
     }
   };
 
   const handleOpenChat = (peer: PublicKey) => {
     console.log("handleOpenChat called with peer:", peer.toBase58());
     chatPeer.value = peer;
-    props.openChat(peer);
-    updateChatData(); // Обновляем данные чата
-    console.log("chatPeer updated to:", chatPeer.value?.toBase58());
-
-    // На мобильных устройствах закрываем меню после выбора чата
+    // On mobile devices, close the menu after selecting a chat
     if (isMobile.value) {
-      props.toggleMenu();
+      toggleMenu();
+
     }
   };
 </script>

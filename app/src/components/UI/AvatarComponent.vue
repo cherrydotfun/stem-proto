@@ -1,14 +1,14 @@
 <template>
   <div class="avatar" :class="{ 'has-avatar': avatar }" :title="userKey">
     <img v-if="avatar" :src="avatar" alt="avatar" />
-    <span v-else class="avatar-letter">{{ userKey.charAt(0) }}</span>
+    <span v-else class="avatar-letter">{{ userKey?.charAt(0) || "0" }}</span>
   </div>
 </template>
 
 <script setup lang="ts">
   const props = defineProps<{
     avatar?: string;
-    userKey: string;
+    userKey: string | undefined;
   }>();
 
   console.log(props.userKey);

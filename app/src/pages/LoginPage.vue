@@ -5,10 +5,9 @@
         <h1>Cherry Chat</h1>
         <p>Connect your wallet to start chatting</p>
       </div>
-
-      <!-- Выбор кошелька -->
+      <!-- Select wallet -->
       <div v-if="!publicKey" class="wallet-selection">
-        <h3>Choose your wallet</h3>
+        <h3>Select a wallet</h3>
         <div class="wallet-buttons">
           <button
             v-for="name in names"
@@ -19,52 +18,66 @@
             <span class="wallet-icon">{{
               name === "Phantom" ? "👻" : "🔑"
             }}</span>
-            Connect to {{ name }} wallet
+            {{ name === "Phantom" ? "Connect Phantom Wallet" : "Create a Test Wallet" }}
           </button>
         </div>
       </div>
 
-      <!-- Информация о пользователе -->
+      <!-- User info -->
       <div v-if="publicKey" class="user-info">
         <div class="user-avatar">
           <AvatarComponent :userKey="publicKey.toBase58()" />
         </div>
         <div class="user-details">
-          <div class="user-key" @click="copyKey" :title="'Click to copy'">
+          <div class="user-key" @click="copyKey(publicKey as PublicKey)" :title="'Click to copy'">
             {{ publicKey.toBase58().slice(0, 4) }}...{{
               publicKey.toBase58().slice(-4)
             }}
           </div>
           <div class="user-balance">
             {{
-              (myAccountInfo.accountInfo?.lamports || 0) / LAMPORTS_PER_SOL
+              myAccount.balance
             }}
             SOL
           </div>
         </div>
       </div>
 
-      <!-- Регистрация -->
+      <!-- airdrop -->
       <div
-        v-if="publicKey && !walletDescriptor.isRegistered"
+        v-if="publicKey && !myAccount.balance"
         class="registration"
       >
         <div class="registration-message">
-          <p>Account is not registered in Cherry Chat</p>
+          <p>Your wallet has no SOL</p>
           <p class="registration-subtitle">
-            You need to register to start chatting
+            To start chatting, please get some SOL.
+          </p>
+        </div>
+        <div class="registration-actions">
+          <button @click="requestAirdrop" class="airdrop-button">
+            Get SOL (devnet)
+          </button>
+        </div>
+      </div>  
+      <!-- Registration -->
+      <div
+        v-if="publicKey && myAccount.balance && !stem.isRegistered"
+        class="registration"
+      >
+        <div class="registration-message">
+          <p>Your wallet is not registered yet</p>
+          <p class="registration-subtitle">
+            To start chatting, please register and make sure your wallet has enough SOL.
           </p>
         </div>
         <div class="registration-actions">
           <button @click="register" class="register-button">Register</button>
-          <button @click="requestAirdrop" class="airdrop-button">
-            Get SOL (test)
-          </button>
         </div>
-      </div>
+      </div>  
 
-      <!-- Успешная регистрация -->
-      <div v-if="publicKey && walletDescriptor.isRegistered" class="success">
+      <!-- Success registration -->
+      <div v-if="publicKey && stem.isRegistered" class="success">
         <div class="success-message">
           <p>✅ Account registered successfully!</p>
           <p>Redirecting to chat...</p>
@@ -77,18 +90,43 @@
 <script setup lang="ts">
   import AvatarComponent from "../components/UI/AvatarComponent.vue";
   import type { PublicKey } from "@solana/web3.js";
-  import { LAMPORTS_PER_SOL } from "@solana/web3.js";
 
-  defineProps<{
-    publicKey: PublicKey | null;
+  import { copyKey } from "../utils/helpers";
+
+  const props = defineProps<{
     names: string[];
-    myAccountInfo: any;
-    walletDescriptor: any;
-    register: () => void;
-    requestAirdrop: () => void;
-    copyKey: () => void;
     _selectWallet: (name: string) => void;
+    connection: any;
+    publicKey: PublicKey | null;
+    myAccount: any;
+    stem: any
+    wallet: any
   }>();
+
+  const requestAirdrop = async () => {
+    console.log("Requesting airdrop");
+    if (props.publicKey && props.myAccount && props.myAccount.raw) {
+      try {
+        await props.connection.requestAirdrop(props.myAccount.raw, 1);
+        console.log("Airdrop successful");
+      } catch (error) {
+        console.error("Airdrop failed:", error);
+        if (error instanceof Error) {
+          alert(`Error getting SOL: ${error.message}`);
+        }
+      }
+    }
+  };
+
+    // register
+    const register = async () => {
+    if (props.wallet.publicKey && props.stem.raw) {
+      const tx = await props.stem.raw.createRegisterTx();
+      await props.wallet.signTransaction(tx);
+      console.log("Register TX sent");
+    }
+  };
+
 </script>
 
 <style scoped>
