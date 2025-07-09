@@ -61,6 +61,7 @@
         router.push("/chat");
       }
     }
+
   });
 </script>
 

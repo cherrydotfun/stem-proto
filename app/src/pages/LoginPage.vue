@@ -5,7 +5,6 @@
         <h1>Cherry Chat</h1>
         <p>Connect your wallet to start chatting</p>
       </div>
-
       <!-- Select wallet -->
       <div v-if="!publicKey" class="wallet-selection">
         <h3>Select a wallet</h3>
@@ -91,6 +90,7 @@
 <script setup lang="ts">
   import AvatarComponent from "../components/UI/AvatarComponent.vue";
   import type { PublicKey } from "@solana/web3.js";
+
   import { copyKey } from "../utils/helpers";
 
   const props = defineProps<{
@@ -126,6 +126,7 @@
       console.log("Register TX sent");
     }
   };
+
 </script>
 
 <style scoped>

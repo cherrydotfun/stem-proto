@@ -1,4 +1,5 @@
 <template>
+
   <div class="menu">
     <div class="chats-list">
       <div class="section-title">Chats</div>
@@ -51,7 +52,7 @@
         </div>
       </div>
     </div>
-    <div class="invite-form">
+    <div class="invite-form" v-show="!isCollapsed">
       <input
         type="text"
         v-model="invitee"
@@ -80,7 +81,9 @@
         }[]
       | undefined;
     currentChat: PublicKey | null;
+    isCollapsed?: boolean;
   }
+
 
   const props = defineProps<MenuComponentProps>();
 
@@ -131,22 +134,33 @@
   .menu {
     display: flex;
     flex-direction: column;
-    /* height: 100%; */
+    flex: 1;
+    overflow: hidden;
+    height: 100%;
   }
 
-  .user-info {
+  .user-avatar-collapsed {
     display: flex;
-    flex-direction: row;
     align-items: center;
-    gap: 30px;
-    padding: 20px;
-    padding-bottom: 40px;
-    border-bottom: 1px solid var(--purple-color);
+    justify-content: center;
+    padding: 20px 0 10px 0;
+  }
+
+  .chat-item-collapsed {
+    justify-content: center;
+    padding: 10px 0;
+  }
+
+  .chat-item-collapsed .peer-info {
+    display: none !important;
+  }
+
+  .scrollable-content {
+    flex: 1;
+    overflow-y: auto;
   }
 
   .chats-list {
-    flex: 1;
-    overflow-y: auto;
     padding: 20px;
   }
 
@@ -243,16 +257,11 @@
     opacity: 0.9;
   }
 
-  .no-invites {
-    color: var(--white-color);
-    opacity: 0.7;
-    text-align: center;
-    padding: 10px;
-  }
-
   .invite-form {
+    margin-top: auto;
     padding: 20px;
     border-top: 1px solid var(--purple-color);
+    background: var(--black-color);
     display: flex;
     flex-direction: column;
     gap: 10px;
@@ -277,16 +286,89 @@
     transition: opacity 0.2s;
   }
 
-  .invite-button:hover {
-    opacity: 0.9;
+  .menu.collapsed .section-title {
+    text-align: center;
+    margin-bottom: 10px;
+  }
+  .menu.collapsed .chats-list {
+    padding: 10px 0;
+  }
+  .menu.collapsed .chat-item {
+    justify-content: center;
   }
 
-  .user-key {
-    cursor: pointer;
-    transition: opacity 0.2s;
-  }
+  /* Мобильные стили */
+  @media (max-width: 768px) {
+    .menu {
+      padding: 10px;
+    }
 
-  .user-key:hover {
-    opacity: 0.8;
+    .chats-list {
+      padding: 15px;
+    }
+
+    .chat-item {
+      padding: 15px;
+      gap: 20px;
+      margin-bottom: 10px;
+    }
+
+    .chat-item-collapsed {
+      padding: 15px 0;
+    }
+
+    .peer-info {
+      flex: 1;
+    }
+
+    .peer-key {
+      font-size: 16px;
+    }
+
+    .invite-item {
+      padding: 15px;
+      gap: 20px;
+      margin-bottom: 10px;
+    }
+
+    .invite-actions {
+      gap: 15px;
+    }
+
+    .accept-button,
+    .reject-button {
+      padding: 12px 20px;
+      font-size: 14px;
+      min-width: 80px;
+    }
+
+    .invite-form {
+      padding: 15px;
+      gap: 15px;
+    }
+
+    .invite-input {
+      padding: 15px;
+      font-size: 16px;
+    }
+
+    .invite-button {
+      padding: 15px 20px;
+      font-size: 16px;
+    }
+
+    .section-title {
+      font-size: 18px;
+      margin-bottom: 20px;
+    }
+
+    .no-chats {
+      font-size: 16px;
+      padding: 20px;
+    }
+
+    .user-avatar-collapsed {
+      padding: 30px 0 20px 0;
+    }
   }
 </style>

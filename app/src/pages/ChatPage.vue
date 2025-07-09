@@ -8,12 +8,12 @@
       }"
     >
       <!-- Side menu -->
+
       <div class="menu-container" :class="{ 'mobile-menu': isMobile }">
         <div class="menu-toggle" @click="toggleMenu">
           <span v-if="isMenuCollapsed">☰</span>
           <span v-else>✕</span>
         </div>
-
         <!-- User info -->
         <div class="user-info" v-show="!isMenuCollapsed">
           <AvatarComponent :userKey="publicKey?.toBase58() || ''" />
@@ -174,6 +174,7 @@
   });
 
   // Check if the device is mobile
+
   const checkMobile = () => {
     isMobile.value = window.innerWidth <= 768;
   };
@@ -223,16 +224,17 @@
       await props.wallet.signTransaction(tx);
       console.log("Send message TX sent");
       message.value = "";
+
     }
   };
 
   const handleOpenChat = (peer: PublicKey) => {
     console.log("handleOpenChat called with peer:", peer.toBase58());
     chatPeer.value = peer;
-  
     // On mobile devices, close the menu after selecting a chat
     if (isMobile.value) {
       toggleMenu();
+
     }
   };
 </script>

@@ -15,6 +15,7 @@ import { PeerStatus } from "./types";
 
 import { PROGRAM_ID, SEED_DESCRIPTOR, SEED_PRIVATE_CHAT } from "./const";
 
+
 export const helpers = {
   getdisc: (name: string) =>
     createHash("sha256").update(`global:${name}`).digest().subarray(0, 8),
