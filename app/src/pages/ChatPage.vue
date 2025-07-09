@@ -18,7 +18,7 @@
         <div class="user-info" v-show="!isMenuCollapsed">
           <AvatarComponent :userKey="publicKey?.toBase58() || ''" />
           <div class="user-details">
-            <div class="user-key" @click="copyKey" :title="'Click to copy'">
+            <div class="user-key" @click="copyKey(publicKey as PublicKey)" :title="'Click to copy'">
               {{ publicKey?.toBase58().slice(0, 4) }}...{{
                 publicKey?.toBase58().slice(-4)
               }}
@@ -98,7 +98,7 @@
           </div>
 
           <div class="chat-messages">
-            <chat :messages="chat.messages" :publicKey="publicKey" />
+            <chat :messages="chat.messages" :publicKey="publicKey as PublicKey" />
           </div>
 
           <div class="chat-input">
@@ -148,7 +148,8 @@
   import { PeerStatus } from "../utils/types";
   import AvatarComponent from "../components/UI/AvatarComponent.vue";
   import MenuComponent from "../components/MenuComponent.vue";
-  import Chat from "../components/chat.vue";
+  import Chat from "../components/chat.vue";  
+  import { copyKey } from "../utils/helpers";
 
   const props = defineProps<{
     publicKey: PublicKey | null;
@@ -185,16 +186,6 @@
   onUnmounted(() => {
     window.removeEventListener("resize", checkMobile);
   });
-
-  const copyKey = async () => {
-    try {
-      await navigator.clipboard.writeText(props.publicKey?.toBase58() || "");
-      // alert("Key copied to clipboard");
-    } catch (err) {
-      console.error("Error copying:", err);
-      alert("Failed to copy key");
-    }
-  };
 
   const invite = async (invitee: string) => {
     const inviteePubkey = new PublicKey(invitee);

@@ -30,7 +30,7 @@
           <AvatarComponent :userKey="publicKey.toBase58()" />
         </div>
         <div class="user-details">
-          <div class="user-key" @click="copyKey" :title="'Click to copy'">
+          <div class="user-key" @click="copyKey(publicKey as PublicKey)" :title="'Click to copy'">
             {{ publicKey.toBase58().slice(0, 4) }}...{{
               publicKey.toBase58().slice(-4)
             }}
@@ -91,14 +91,14 @@
 <script setup lang="ts">
   import AvatarComponent from "../components/UI/AvatarComponent.vue";
   import type { PublicKey } from "@solana/web3.js";
-  import { Account } from "../utils/solana";
+  import { copyKey } from "../utils/helpers";
 
   const props = defineProps<{
     names: string[];
     _selectWallet: (name: string) => void;
     connection: any;
     publicKey: PublicKey | null;
-    myAccount: Account;
+    myAccount: any;
     stem: any
     wallet: any
   }>();
@@ -107,7 +107,7 @@
     console.log("Requesting airdrop");
     if (props.publicKey && props.myAccount && props.myAccount.raw) {
       try {
-        await props.connection.requestAirdrop(props.myAccount.raw as Account, 1);
+        await props.connection.requestAirdrop(props.myAccount.raw, 1);
         console.log("Airdrop successful");
       } catch (error) {
         console.error("Airdrop failed:", error);

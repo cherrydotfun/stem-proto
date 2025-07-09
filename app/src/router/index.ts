@@ -1,17 +1,15 @@
 import { createRouter, createWebHistory } from 'vue-router';
-import LoginPage from '../pages/LoginPage.vue';
-import ChatPage from '../pages/ChatPage.vue';
 
 const routes = [
   {
     path: '/',
     name: 'Login',
-    component: LoginPage
+    component: () => import('../pages/LoginPage.vue')
   },
   {
     path: '/chat',
     name: 'Chat',
-    component: ChatPage,
+    component: () => import('../pages/ChatPage.vue'),
     meta: { requiresAuth: true }
   }
 ];
