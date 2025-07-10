@@ -6,13 +6,25 @@ export const useWallet = (initWallets: any[]) => {
   const _wallets = ref<any>(initWallets);
   const selectedWallet = ref<any>(null);
 
+  const savedWalletName = sessionStorage.getItem("selectedWalletName");
+  if (savedWalletName) {
+    selectedWallet.value = _wallets.value.find(
+      (wallet: any) => wallet.name === savedWalletName
+    );
+    if (selectedWallet.value && selectedWallet.value.connect) {
+      selectedWallet.value.connect();
+    }
+  }
+
   const selectWallet = (name: string) => {
     selectedWallet.value = _wallets.value.find(
       (wallet: any) => wallet.name === name
     );
+    sessionStorage.setItem("selectedWalletName", name);
   };
   const disconnect = () => {
     selectedWallet.value = null;
+    sessionStorage.removeItem("selectedWalletName");
   };
 
   const wallets = computed(() => {

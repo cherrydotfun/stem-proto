@@ -19,7 +19,7 @@
   import { useLocalWallet } from "./composables/localWallet";
   import { usePhantomWallet } from "./composables/phantomWallet";
   import { useWallet } from "./composables/wallet";
-  import { computed, watch } from "vue";
+  import { computed, watch, onMounted, onUnmounted } from "vue";
   import { useRouter } from "vue-router";
   import { useStem } from "./composables/stem";
 
@@ -64,8 +64,24 @@
     }
 
   });
+
+// Dynamic vh fix for mobile browsers
+const setVh = () => {
+  document.documentElement.style.setProperty('--vh', `${window.innerHeight * 0.01}px`);
+};
+onMounted(() => {
+  setVh();
+  window.addEventListener('resize', setVh);
+});
+onUnmounted(() => {
+  window.removeEventListener('resize', setVh);
+});
 </script>
 
 <style scoped>
   /* Global styles can be added here */
+  :global(html), :global(body), :global(#app) {
+    height: calc(var(--vh, 1vh) * 100);
+    min-height: calc(var(--vh, 1vh) * 100);
+  }
 </style>
