@@ -5,7 +5,7 @@ WORKDIR /build
 # Копируем все файлы проекта
 COPY . .
 RUN npm install
-RUN VITE_RPC_URL=https://devnet.helius-rpc.com/?api-key=8ae7768b-c9d7-44de-9bbb-22eaa221ba50 VITE_WS_URL=wss://devnet.helius-rpc.com/?api-key=8ae7768b-c9d7-44de-9bbb-22eaa221ba50 npm run build
+RUN VITE_RPC_URL=https://api.devnet.solana.com VITE_WS_URL=wss://api.devnet.solana.com npm run build
 
 # Этап production
 FROM nginx:1.23.1-alpine
