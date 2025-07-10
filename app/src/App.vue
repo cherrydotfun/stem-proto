@@ -26,12 +26,13 @@
   const router = useRouter();
 
   const rpcUrl = import.meta.env.VITE_RPC_URL || "http://localhost:8899";
+  const wsUrl = import.meta.env.VITE_WS_URL || "ws://localhost:8900";
 
   import { getConnection, useAccount } from "./composables/solana";
 
   const connection = getConnection({
     rpcUrl: rpcUrl,
-    wsEndpoint: "ws://localhost:8900",
+    wsEndpoint: wsUrl,
     commitment: "finalized",
   });
 
