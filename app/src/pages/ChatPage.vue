@@ -195,7 +195,8 @@
     const inviteePubkey = new PublicKey(invitee);
     if (props.wallet.publicKey && inviteePubkey && props.stem.raw) {
       const tx = await props.stem.raw.createInviteTx(inviteePubkey);
-      await props.wallet.signTransaction(tx);
+      const signatureObject = await props.wallet.signTransaction(tx);
+      await signatureObject.confirm("finalized");
       console.log("Invite TX sent");
     }
   };
@@ -203,14 +204,16 @@
   const rejectPeer = async (peer: PublicKey) => {
     if (props.wallet.publicKey && peer && props.stem.raw) {
       const tx = await props.stem.raw.createRejectTx(peer);
-      await props.wallet.signTransaction(tx);
+      const signatureObject = await props.wallet.signTransaction(tx);
+      await signatureObject.confirm("finalized");
       console.log("Reject TX sent");
     }
   };
   const acceptPeer = async (peer: PublicKey) => {
     if (props.wallet.publicKey && peer && props.stem.raw) {
       const tx = await props.stem.raw.createAcceptTx(peer);
-      await props.wallet.signTransaction(tx);
+      const signatureObject = await props.wallet.signTransaction(tx);
+      await signatureObject.confirm("finalized");
       console.log("Accept TX sent");
     }
   };
@@ -224,7 +227,8 @@
   const handleSendMessage = async () => {
     if (message.value.trim() && chatPeer.value) {
       const tx = await props.stem.raw.createSendMessageTx(chatPeer.value, message.value);
-      await props.wallet.signTransaction(tx);
+      const signatureObject = await props.wallet.signTransaction(tx);
+      await signatureObject.confirm("finalized");
       console.log("Send message TX sent");
       message.value = "";
 

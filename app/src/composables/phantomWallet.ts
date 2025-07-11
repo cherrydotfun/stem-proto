@@ -1,6 +1,7 @@
 import { PhantomWalletAdapter } from "@solana/wallet-adapter-phantom";
 import { Connection, PublicKey, Transaction } from "@solana/web3.js";
 import { ref } from "vue";
+import { Signature } from "../utils/solana";
 
 export const usePhantomWallet = (rpcUrl: string = "http://localhost:8899") => {
   const name = ref("Phantom");
@@ -39,12 +40,12 @@ export const usePhantomWallet = (rpcUrl: string = "http://localhost:8899") => {
     const signature = await wallet.sendTransaction(tx, connection, {
       minContextSlot,
     });
-    await connection.confirmTransaction({
-      blockhash,
-      lastValidBlockHeight,
-      signature,
-    });
-    return signature;
+    // await connection.confirmTransaction({
+    //   blockhash,
+    //   lastValidBlockHeight,
+    //   signature,
+    // });
+    return new Signature(signature, connection);
   };
 
   return { name, installed, publicKey, connect, connected, signTransaction };
