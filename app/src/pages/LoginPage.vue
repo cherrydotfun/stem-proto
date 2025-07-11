@@ -54,10 +54,14 @@
             To start chatting, please get some SOL.
           </p>
         </div>
-        <div class="registration-actions">
+        <div v-if="!airdropIsInProgress" class="registration-actions">
           <button @click="requestAirdrop" class="airdrop-button">
             Get SOL (devnet)
           </button>
+        </div>
+        <div v-else class="registration-actions">
+          <p>Airdrop in progress...</p>
+          <div class="loader"></div>
         </div>
       </div>  
       <!-- Registration -->
@@ -71,8 +75,12 @@
             To start chatting, please register and make sure your wallet has enough SOL.
           </p>
         </div>
-        <div class="registration-actions">
+        <div v-if="!registrationIsInProgress" class="registration-actions">
           <button @click="register" class="register-button">Register</button>
+        </div>
+        <div v-else class="registration-actions">
+          <p>Registration in progress...</p>
+          <div class="loader"></div>
         </div>
       </div>  
 
@@ -92,7 +100,7 @@
   import type { PublicKey } from "@solana/web3.js";
 
   import { copyKey } from "../utils/helpers";
-  import { onMounted, onUnmounted } from "vue";
+  import { onMounted, onUnmounted, ref } from "vue";
 
   // Dynamic vh fix for mobile browsers
   const setVh = () => {
@@ -106,7 +114,9 @@
     window.removeEventListener('resize', setVh);
   });
 
-  import { Signature } from "../utils/solana";
+
+  const airdropIsInProgress = ref(false);
+  const registrationIsInProgress = ref(false);
 
 
   const props = defineProps<{
@@ -123,10 +133,12 @@
     console.log("Requesting airdrop");
     if (props.publicKey && props.myAccount && props.myAccount.raw) {
       try {
+        airdropIsInProgress.value = true;
         const signatureObject = await props.connection.requestAirdrop(props.myAccount.raw, 1);
         console.log("Waiting for airdrop to be confirmed");
         await signatureObject.confirm("finalized");
         console.log("Airdrop finalized");
+        airdropIsInProgress.value = false;
       } catch (error) {
         console.error("Airdrop failed:", error);
         if (error instanceof Error) {
@@ -139,10 +151,12 @@
     // register
     const register = async () => {
     if (props.wallet.publicKey && props.stem.raw) {
+      registrationIsInProgress.value = true;
       const tx = await props.stem.raw.createRegisterTx();
       const signatureObject = await props.wallet.signTransaction(tx);
       await signatureObject.confirm("finalized");
       console.log("Register TX sent", signatureObject);
+      registrationIsInProgress.value = false;
     }
   };
 
@@ -295,7 +309,7 @@
   }
 
   .register-button:hover {
-    background: rgba(150, 70, 253, 0.8);
+    background: #9646fdcc;
     transform: translateY(-2px);
   }
 
@@ -323,7 +337,30 @@
     font-size: 16px;
   }
 
-  /* Мобильные стили */
+/* HTML: <div class="loader"></div> */
+.loader {
+  width: 80px;
+  height: 70px;
+  border: 5px solid #00000000;
+  padding: 0 8px;
+  box-sizing: border-box;
+  background:
+    linear-gradient(#28a745 0 0) 0    0/8px 20px,
+    linear-gradient(#28a745 0 0) 100% 0/8px 20px,
+    radial-gradient(farthest-side,#9646fdcc 90%,#9646fdcc) 0 5px/8px 8px content-box,
+    #00000000;
+  background-repeat: no-repeat; 
+  animation: l3 2s infinite linear;
+
+  margin: 0 auto;
+}
+@keyframes l3{
+  25% {background-position: 0 0   ,100% 100%,100% calc(100% - 5px)}
+  50% {background-position: 0 100%,100% 100%,0    calc(100% - 5px)}
+  75% {background-position: 0 100%,100%    0,100% 5px}
+}
+
+  /* mobile styles */
   @media (max-width: 768px) {
     .login-container {
       padding: 10px;

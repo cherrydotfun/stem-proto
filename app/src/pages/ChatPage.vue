@@ -108,12 +108,13 @@
               placeholder="Type a message..."
               @keyup.enter="handleSendMessage"
             />
-            <button @click="handleSendMessage" :disabled="!message.trim()" class="send-button">
+            <button v-if="canSendMessage" @click="handleSendMessage" :disabled="!message.trim()" class="send-button">
               <span v-if="!isMobile">Send</span>
               <span v-else class="send-icon">
                 <img src="../assets/img/icons/send.svg" alt="Send"/>
               </span>
             </button>
+            <div v-else class="loader"></div>
           </div>
         </div>
 
@@ -223,15 +224,17 @@
   const chat = props.useChat(computed(() => chatPeer.value));
 
   const message = ref<string>("");
+  const canSendMessage = ref(true);
 
   const handleSendMessage = async () => {
     if (message.value.trim() && chatPeer.value) {
       const tx = await props.stem.raw.createSendMessageTx(chatPeer.value, message.value);
+      message.value = "";
+      canSendMessage.value = false;
       const signatureObject = await props.wallet.signTransaction(tx);
       await signatureObject.confirm("finalized");
       console.log("Send message TX sent");
-      message.value = "";
-
+      canSendMessage.value = true;
     }
   };
 
@@ -557,7 +560,7 @@
   }
 
   .chat-input button:hover:not(:disabled) {
-    background-color: rgba(150, 70, 253, 0.8);
+    background-color: #9646fdcc;
   }
 
   .chat-input button:disabled {
@@ -620,6 +623,34 @@
   .debug-info p {
     margin: 5px 0;
   }
+
+/* HTML: <div class="loader"></div> */
+.loader {
+  width: 35px;
+  aspect-ratio: 1;
+  color: var(--purple-color);
+  background: conic-gradient(currentColor 0 270deg,#0000 0);
+  border-radius: 50%;
+  animation: l14-0 4s infinite linear;
+}
+.loader::before {
+  content: "";
+  display: block;
+  height: 50%;
+  width: 50%;
+  border-top-left-radius: 100px;
+  background: currentColor;
+  animation: l14 0.5s infinite alternate;
+}
+@keyframes l14-0 {
+    0%,24.99%  {transform: rotate(0deg)}
+    25%,49.99% {transform: rotate(90deg)}
+    50%,74.99% {transform: rotate(180deg)}
+    75%,100%   {transform: rotate(270deg)}
+}
+@keyframes l14 {
+    100%  {transform: translate(-10px,-10px)}
+}
 
   /* Мобильные стили */
   @media (max-width: 768px) {
