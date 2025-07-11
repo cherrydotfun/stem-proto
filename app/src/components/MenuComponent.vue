@@ -25,7 +25,7 @@
           </div>
         </div>
       </div>
-      <div v-else class="no-chats">No chats yet</div>
+      <div v-else class="no-chats">No accepted chats yet</div>
     </div>
     <div class="invites-list" v-if="requestedPeers.length">
       <div class="section-title">Chat Requests</div>
@@ -42,12 +42,36 @@
             }}
           </div>
           <div class="invite-actions">
-            <button @click="acceptPeer(peer.pubkey)" class="accept-button">
-              Accept
-            </button>
-            <button @click="rejectPeer(peer.pubkey)" class="reject-button">
-              Reject
-            </button>
+            <span v-if="!reacted[peer.pubkey?.toBase58() || '']">
+              <button @click="acceptPeer(peer.pubkey)" class="accept-button">
+                Accept
+              </button>
+              <button @click="rejectPeer(peer.pubkey)" class="reject-button">
+                Reject
+              </button>
+            </span>
+            <span v-else>
+              <div>
+                <div class="loader"></div>
+              </div>
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="invites-list" v-if="invitedPeers.length">
+      <div class="section-title">Invited</div>
+      <div
+        v-for="peer in invitedPeers"
+        :key="peer.pubkey?.toBase58()"
+        class="invite-item"
+      >
+        <AvatarComponent :userKey="peer.pubkey?.toBase58() || ''" />
+        <div class="peer-info">
+          <div class="peer-key">
+            {{ peer.pubkey?.toBase58().slice(0, 4) }}...{{
+              peer.pubkey?.toBase58().slice(-4)
+            }}
           </div>
         </div>
       </div>
@@ -65,12 +89,16 @@
 </template>
 
 <script setup lang="ts">
-  import { computed, ref } from "vue";
+  import { computed, reactive, ref } from "vue";
   import { PublicKey } from "@solana/web3.js";
 
   import { PeerStatus } from "../utils/types";
 
   import AvatarComponent from "./UI/AvatarComponent.vue";
+
+  const reacted = reactive<{
+    [key: string]: boolean;
+  }>({});
 
   interface MenuComponentProps {
     userKey: string;
@@ -107,6 +135,11 @@
     return props.chats.filter((peer) => peer.status === PeerStatus.Requested);
   });
 
+  const invitedPeers = computed(() => {
+    if (!props.chats) return [];
+    return props.chats.filter((peer) => peer.status === PeerStatus.Invited);
+  });
+
   const openChat = (peer: PublicKey | null) => {
     if (!peer) return;
     emit("openChat", peer);
@@ -122,11 +155,13 @@
   const acceptPeer = (peer: PublicKey | null) => {
     if (!peer) return;
     emit("acceptPeer", peer);
+    reacted[peer.toBase58()] = true;
   };
 
   const rejectPeer = (peer: PublicKey | null) => {
     if (!peer) return;
     emit("rejectPeer", peer);
+    reacted[peer.toBase58()] = true;
   };
 </script>
 
@@ -202,7 +237,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    height: 100%;
+    /* height: 100%; */
     color: var(--white-color);
     opacity: 0.7;
   }
@@ -226,7 +261,7 @@
     border-radius: 8px;
   }
 
-  .invite-actions {
+  .invite-actions span {
     display: flex;
     gap: 10px;
   }
@@ -297,7 +332,18 @@
     justify-content: center;
   }
 
-  /* Мобильные стили */
+
+  /* HTML: <div class="loader"></div> */
+.loader {
+  width: 40px;
+  aspect-ratio: 4;
+  background: radial-gradient(circle closest-side,#28a745 90%,#28a74500) 0/calc(100%/3) 100% space;
+  clip-path: inset(0 100% 0 0);
+  animation: l1 1s steps(4) infinite;
+}
+@keyframes l1 {to{clip-path: inset(0 -34% 0 0)}}
+
+  /* mobile styles */
   @media (max-width: 768px) {
     .menu {
       padding: 10px;
@@ -364,7 +410,8 @@
 
     .no-chats {
       font-size: 16px;
-      padding: 20px;
+      /* padding: 20px; */
+      margin-bottom: 20px;
     }
 
     .user-avatar-collapsed {
