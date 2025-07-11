@@ -1,5 +1,6 @@
 import { Connection, Keypair, PublicKey, Transaction } from "@solana/web3.js";
 import { ref } from "vue";
+import { Signature } from "../utils/solana";
 
 export const useLocalWallet = (rpcUrl: string = "http://localhost:8899") => {
   const name = ref("Local");
@@ -56,7 +57,7 @@ export const useLocalWallet = (rpcUrl: string = "http://localhost:8899") => {
 
     const signature = await connection.sendTransaction(tx, [keypair.value]);
     console.log("Transaction sent", signature);
-    return signature;
+    return new Signature(signature, connection);
   };
 
   return { name, installed, publicKey, connect, connected, signTransaction };

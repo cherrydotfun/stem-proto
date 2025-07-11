@@ -125,9 +125,8 @@
     const register = async () => {
     if (props.wallet.publicKey && props.stem.raw) {
       const tx = await props.stem.raw.createRegisterTx();
-      const signature = await props.wallet.signTransaction(tx);
-      const signatureObject = new Signature(signature, props.connection);
-      await signatureObject.confirm();
+      const signatureObject = await props.wallet.signTransaction(tx);
+      await signatureObject.confirm("finalized");
       console.log("Register TX sent", signatureObject);
     }
   };
