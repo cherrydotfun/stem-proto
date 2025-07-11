@@ -78,7 +78,7 @@
       <div class="chat-container">
         <div v-if="chatPeer" class="chat-container-inner">
           <div class="chat-header">
-            <!-- Кнопка открытия меню для мобильных устройств -->
+            <!-- Mobile menu button -->
             <button
               v-if="isMobile"
               class="mobile-menu-button"
@@ -108,14 +108,17 @@
               placeholder="Type a message..."
               @keyup.enter="handleSendMessage"
             />
-            <button @click="handleSendMessage" :disabled="!message.trim()">
-              Send
+            <button @click="handleSendMessage" :disabled="!message.trim()" class="send-button">
+              <span v-if="!isMobile">Send</span>
+              <span v-else class="send-icon">
+                <img src="../assets/img/icons/send.svg" alt="Send"/>
+              </span>
             </button>
           </div>
         </div>
 
         <div v-else class="chat-placeholder">
-          <!-- Кнопка открытия меню для мобильных устройств в placeholder -->
+          <!-- Mobile menu button in placeholder -->
           <button
             v-if="isMobile"
             class="mobile-menu-button placeholder-menu-button"
@@ -241,11 +244,23 @@
 
     }
   };
+
+  // Dynamic vh fix for mobile browsers
+  const setVh = () => {
+    document.documentElement.style.setProperty('--vh', `${window.innerHeight * 0.01}px`);
+  };
+  onMounted(() => {
+    setVh();
+    window.addEventListener('resize', setVh);
+  });
+  onUnmounted(() => {
+    window.removeEventListener('resize', setVh);
+  });
 </script>
 
 <style scoped>
   .chat-page {
-    height: 100vh;
+    height: calc(var(--vh, 1vh) * 100);
     background-color: var(--black-color);
   }
 
@@ -466,7 +481,7 @@
   .chat-container {
     display: flex;
     flex-direction: column;
-    height: 100vh;
+    height: calc(var(--vh, 1vh) * 100);
     background-color: rgb(31, 30, 30);
     min-width: 0;
   }
@@ -514,6 +529,7 @@
     display: flex;
     gap: 10px;
     flex-shrink: 0;
+    align-items: center;
   }
 
   .chat-input input {
@@ -545,8 +561,19 @@
   }
 
   .chat-input button:disabled {
-    background: #666;
     cursor: not-allowed;
+  }
+
+  .send-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .send-icon img {
+    width: 19px;
+    height: 19px;
+    margin-right: 2px;
   }
 
   .chat-placeholder {
@@ -691,6 +718,31 @@
       padding: 15px;
     }
 
+    .chat-input .send-button {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      padding: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background-color: var(--purple-color);
+      color: var(--white-color);
+      border: none;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      flex-shrink: 0;
+    }
+
+    .chat-input .send-button:hover:not(:disabled) {
+      background-color: rgba(150, 70, 253, 0.8);
+      transform: scale(1.1);
+    }
+
+    .chat-input .send-button:disabled {
+      cursor: not-allowed;
+    }
+
     .chat-messages {
       padding: 15px;
     }
@@ -710,19 +762,11 @@
 
   @media (max-width: 443px) {
     .chat-input {
-      display: flex;
-      flex-direction: column;
-      align-items: stretch;
-      gap: 5px;
+      padding: 10px;
     }
-    .chat-input input {
-      padding: 7px;
-    }
-    .chat-input button {
-      width: 100%;
-      min-width: 0;
-      font-size: 14px;
-      padding: 8px 0;
+    .chat-input .send-button {
+      width: 35px;
+      height: 35px;
     }
   }
 

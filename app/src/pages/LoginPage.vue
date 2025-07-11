@@ -92,7 +92,22 @@
   import type { PublicKey } from "@solana/web3.js";
 
   import { copyKey } from "../utils/helpers";
+  import { onMounted, onUnmounted } from "vue";
+
+  // Dynamic vh fix for mobile browsers
+  const setVh = () => {
+    document.documentElement.style.setProperty('--vh', `${window.innerHeight * 0.01}px`);
+  };
+  onMounted(() => {
+    setVh();
+    window.addEventListener('resize', setVh);
+  });
+  onUnmounted(() => {
+    window.removeEventListener('resize', setVh);
+  });
+
   import { Signature } from "../utils/solana";
+
 
   const props = defineProps<{
     names: string[];
@@ -135,7 +150,7 @@
 
 <style scoped>
   .login-container {
-    min-height: 100vh;
+    min-height: calc(var(--vh, 1vh) * 100);
     display: flex;
     align-items: center;
     justify-content: center;
