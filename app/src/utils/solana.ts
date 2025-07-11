@@ -108,7 +108,7 @@ export class Account {
 
 export class Connection {
   private _connection: Web3Connection;
-  private _commitment: Commitment;
+  // private _commitment: Commitment;
 
   constructor(
     rpcUrl: string = "http://localhost:8899",
@@ -119,7 +119,7 @@ export class Connection {
       wsEndpoint,
       commitment,
     });
-    this._commitment = commitment;
+    // this._commitment = commitment;
   }
 
   getAccount(publicKey: PublicKey, subscribe: boolean = false) {
@@ -137,7 +137,7 @@ export class Connection {
       account.publicKey,
       amount * LAMPORTS_PER_SOL
     );
-    return new Signature(signature, this._connection, true);
+    return new Signature(signature, this._connection);
   }
 }
 

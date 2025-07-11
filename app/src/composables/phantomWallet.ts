@@ -34,7 +34,6 @@ export const usePhantomWallet = (rpcUrl: string = "http://localhost:8899") => {
 
     const {
       context: { slot: minContextSlot },
-      value: { blockhash, lastValidBlockHeight },
     } = await connection.getLatestBlockhashAndContext();
 
     const signature = await wallet.sendTransaction(tx, connection, {
