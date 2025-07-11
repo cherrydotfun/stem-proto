@@ -4,7 +4,7 @@ import {
   PublicKey,
 } from "@solana/web3.js";
 
-import type { AccountInfo, Commitment, Transaction } from "@solana/web3.js";
+import type { AccountInfo, Commitment, Transaction as Web3Transaction } from "@solana/web3.js";
 
 import { EventEmitter } from "events";
 
@@ -137,10 +137,110 @@ export class Connection {
       account.publicKey,
       amount * LAMPORTS_PER_SOL
     );
-    return await this._connection.confirmTransaction(
-      signature,
-      this._commitment
-    );
+    return new Signature(signature, this._connection, true);
+  }
+}
+
+export class Signature {
+  private _signature: string;
+  private _connection: Web3Connection;
+  private _emitter: EventEmitter | null;
+
+  private _slot: number;
+  private _confirmations: number | null;
+  private _err: Error | null;
+  private _status: any;
+  private _confirmationStatus: "finalized" | "confirmed" | "processed";
+  private _isInitialized: boolean;
+
+  constructor(signature: string, connection: Web3Connection) {
+    console.log("SOLANA: Signature constructor", signature, connection);
+
+    this._signature = signature;
+    this._connection = connection;
+    this._emitter = new EventEmitter();
+
+    this._slot = 0;
+    this._confirmations = null;
+    this._err = null;
+    this._status = null;
+    this._confirmationStatus = "processed";
+    this._isInitialized = false;
+  }
+
+  get signature() {
+    return this._signature;
+  }
+
+  get slot() {
+    return this._slot;
+  }
+
+  get confirmations() {
+    return this._confirmations;
+  }
+
+  get err() {
+    return this._err;
+  }
+
+  get status() {
+    return this._status;
+  }
+
+  get confirmationStatus() {
+    return this._confirmationStatus;
+  }
+
+  // onUpdate(callback: (signature: Signature) => void) {
+  //   return this._emitter?.on("update", callback);
+  // }
+
+  _update(signature: any) {
+    if (!signature) {
+      return;
+    }
+
+    this._slot = signature.slot;
+    this._confirmations = signature.confirmations;
+    this._err = signature.err;
+    this._status = signature.status;
+    this._confirmationStatus = signature.confirmationStatus;
+  }
+
+  async fetch() {
+    const signatureResult = await this._connection.getSignatureStatus(this._signature);
+    console.log("SOLANA: Signature fetched", signatureResult);
+    this._update(signatureResult.value);
+    this._isInitialized = true;
+    this._emitter?.emit("update", this);
+
+    return this;
+  }
+
+  confirm(commitment: Commitment = "finalized") {
+
+    return new Promise(async (resolve, reject) => {
+      if (!this._isInitialized) {
+        await this.fetch();
+      }
+      const updateListener = (signature: Signature) => {
+        if (signature.confirmationStatus === commitment) {
+          resolve(signature);
+          this._emitter?.off("update", updateListener);
+        }
+        if (signature.err) {
+          reject(signature.err);
+          this._emitter?.off("update", updateListener);
+        }
+      }
+      this._emitter?.on("update", updateListener);
+
+      this._connection.onSignature(this._signature, async () => {
+        await this.fetch();
+        this._emitter?.emit("update", this);
+      }, commitment);
+    });
   }
 }
 
@@ -162,5 +262,5 @@ export interface Wallet {
   publicKey: PublicKey | null;
   connect: () => Promise<void>;
   disconnect: () => Promise<void>;
-  signTransaction: (tx: Transaction) => Promise<string>;
+  signTransaction: (tx: Web3Transaction) => Promise<string>;
 }

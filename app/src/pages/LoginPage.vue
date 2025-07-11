@@ -92,6 +92,7 @@
   import type { PublicKey } from "@solana/web3.js";
 
   import { copyKey } from "../utils/helpers";
+  import { Signature } from "../utils/solana";
 
   const props = defineProps<{
     names: string[];
@@ -107,8 +108,10 @@
     console.log("Requesting airdrop");
     if (props.publicKey && props.myAccount && props.myAccount.raw) {
       try {
-        await props.connection.requestAirdrop(props.myAccount.raw, 1);
-        console.log("Airdrop successful");
+        const signatureObject = await props.connection.requestAirdrop(props.myAccount.raw, 1);
+        console.log("Waiting for airdrop to be confirmed");
+        await signatureObject.confirm("finalized");
+        console.log("Airdrop finalized");
       } catch (error) {
         console.error("Airdrop failed:", error);
         if (error instanceof Error) {
@@ -122,8 +125,9 @@
     const register = async () => {
     if (props.wallet.publicKey && props.stem.raw) {
       const tx = await props.stem.raw.createRegisterTx();
-      await props.wallet.signTransaction(tx);
-      console.log("Register TX sent");
+      const signatureObject = await props.wallet.signTransaction(tx);
+      await signatureObject.confirm("finalized");
+      console.log("Register TX sent", signatureObject);
     }
   };
 
