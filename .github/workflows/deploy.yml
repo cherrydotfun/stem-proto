@@ -1,0 +1,45 @@
+name: Build & Deploy
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Get short commit hash
+        id: commit
+        run: echo "short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+      - name: Log in to GitLab registry
+        uses: docker/login-action@v3
+        with:
+          registry: registry.gitlab.com
+          username: ${{ secrets.REGISTRY_USERNAME }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./app
+          file: ./app/Dockerfile
+          push: true
+          tags: ${{ secrets.REGISTRY_PATH }}/cherry-chat:${{ steps.commit.outputs.short }}
+
+      - name: Deploy to remote VM
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: deploybot
+          key: ${{ secrets.VM_SSH_KEY }}
+          script: |
+            docker pull ${{ secrets.REGISTRY_PATH }}/cherry-chat:${{ steps.commit.outputs.short }}
+            docker stop cherry-chat || true
+            docker rm cherry-chat || true
+            docker run -d --name cherry-chat -p 80:80 ${{ secrets.REGISTRY_PATH }}/cherry-chat:${{ steps.commit.outputs.short }}
