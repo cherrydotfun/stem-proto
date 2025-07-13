@@ -39,7 +39,9 @@ jobs:
           username: deploybot
           key: ${{ secrets.VM_SSH_KEY }}
           script: |
-            docker pull ${{ secrets.REGISTRY_PATH }}/cherry-chat:${{ steps.commit.outputs.short }}
-            docker stop cherry-chat || true
-            docker rm cherry-chat || true
-            docker run -d --name cherry-chat -p 80:80 ${{ secrets.REGISTRY_PATH }}/cherry-chat:${{ steps.commit.outputs.short }}
+            set -e
+            export IMAGE_TAG="${{ secrets.REGISTRY_PATH }}/cherry-chat:${{ steps.commit.outputs.short }}"
+            docker pull $IMAGE_TAG
+            cd /opt/cherry-chat
+            IMAGE_TAG=$IMAGE_TAG docker compose down --remove-orphans
+            IMAGE_TAG=$IMAGE_TAG docker compose up -d
