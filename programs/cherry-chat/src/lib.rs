@@ -144,7 +144,7 @@ pub mod cherry_chat {
 
         let current_timestamp = Clock::get().unwrap().unix_timestamp;
 
-        private_chat.messages.push(PrivateMessage {
+        private_chat.messages.push(Message {
             sender: payer.key(),
             content,
             timestamp: current_timestamp,
@@ -246,19 +246,35 @@ pub enum PeerState{
 // Peer is a peer in a private chat.
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct Peer {
-    wallet: Pubkey,
-    state: PeerState,
+    pub wallet: Pubkey,
+    pub state: PeerState,
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq, Eq)]
+pub enum GroupState{
+    Invited = 0,
+    Joined = 1,
+    Rejected = 2,
+    Left = 3,
+    Kicked = 4,
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone)]
+pub struct Group {
+    pub account: Pubkey,
+    pub state: GroupState,
 }
 
 // WalletDescriptor is a descriptor for a wallet.
 #[account]
 pub struct WalletDescriptor {
     pub peers: Vec<Peer>,
+    pub groups: Vec<Group>,
 }
 
 // PrivateMessage is a message in a private chat.
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
-pub struct PrivateMessage{
+pub struct Message{
     pub sender: Pubkey,
     pub content: String,
     pub timestamp: i64,
@@ -269,5 +285,14 @@ pub struct PrivateMessage{
 pub struct PrivateChat {
     pub wallets: [Pubkey; 2],
     pub length: u32,
-    pub messages: Vec<PrivateMessage>,
+    pub messages: Vec<Message>,
+}
+
+#[account]
+pub struct GroupChat {
+    pub title: String,
+    pub owner: Pubkey,
+    pub members: Vec<Peer>,
+    pub length: u32,
+    pub messages: Vec<Message>
 }
