@@ -153,7 +153,14 @@ pub mod cherry_chat {
         let message_length = 32 + 4 + private_chat.messages.last().unwrap().content.len() as u32 + 8;
         private_chat.length += message_length;
 
-        msg!("Msg: {:?}", payer.key());
+        // Find the receiver (the other wallet in the private chat)
+        let receiver = if private_chat.wallets[0] == payer.key() {
+            private_chat.wallets[1]
+        } else {
+            private_chat.wallets[0]
+        };
+
+        msg!("Msg: sender={:?}, receiver={:?}", payer.key(), receiver);
 
         Ok(())
     }
