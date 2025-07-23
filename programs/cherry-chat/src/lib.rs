@@ -41,13 +41,6 @@ fn get_hash(a: Pubkey, b: Pubkey) -> [u8; 32] {
 #[program]
 pub mod cherry_chat {
     use super::*;
-
-
-    pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
-        msg!("Greetings from: {:?}", ctx.program_id);
-        Ok(())
-    }
-    
     pub fn register(_ctx: Context<Register>) -> Result<()> {        
         Ok(())
     }
@@ -134,7 +127,7 @@ pub mod cherry_chat {
         Ok(())
     }
 
-    pub fn sendmessage(ctx: Context<SendMessage>, _hash: [u8; 32], content: String) -> Result<()> {
+    pub fn sendmessage(ctx: Context<SendMessage>, _hash: [u8; 32], content: Vec<u8>) -> Result<()> {
         let payer = &mut ctx.accounts.payer;
         let private_chat = &mut ctx.accounts.private_chat;
 
