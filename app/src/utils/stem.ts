@@ -225,7 +225,7 @@ export class Stem {
       length: chat.length,
       messages: chat.messages.map((message) => ({
         sender: new PublicKey(message.sender),
-        content: message.content,
+        content: message.content.toString(),
         timestamp: new Date(
           Buffer.from(message.timestamp.slice(0, 4)).readUint32LE() * 1000
         ),
@@ -504,7 +504,7 @@ export class Stem {
     }
 
     const buf = Buffer.alloc(4);
-    buf.writeUInt32LE(message.length, 0);
+    buf.writeUInt32LE(Buffer.from(message).length, 0);
 
     const ix = new TransactionInstruction({
       programId: PROGRAM_ID,
