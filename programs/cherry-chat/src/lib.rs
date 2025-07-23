@@ -156,17 +156,46 @@ pub mod cherry_chat {
         Ok(())
     }
 
-    // pub fn accept(ctx: Context<Accept>) -> Result<()> {
-    //     Ok(())
-    // }
+    pub fn create_group(ctx: Context<CreateGroup>, title: Vec<u8>, description: Vec<u8>, image_url: Vec<u8>) -> Result<()> {
+        Ok(())
+    }
 
-    // pub fn reject(ctx: Context<Reject>) -> Result<()> {
-    //     Ok(())
-    // }
+    pub fn invite_to_group(ctx: Context<InviteToGroup>) -> Result<()> {
+        Ok(())
+    }
 
-    // pub fn send_message(ctx: Context<SendMessage>) -> Result<()> {
-    //     Ok(())
-    // }
+    pub fn join_group(ctx: Context<JoinGroup>) -> Result<()> {
+        Ok(())
+    }
+
+    pub fn accept_invite_to_group(ctx: Context<AcceptInviteToGroup>) -> Result<()> {
+        Ok(())
+    }
+    
+    pub fn reject_invite_to_group(ctx: Context<RejectInviteToGroup>) -> Result<()> {
+        Ok(())
+    }
+
+    
+    pub fn send_message_to_group(ctx: Context<SendMessageToGroup>, content: Vec<u8>) -> Result<()> {
+        Ok(())
+    }
+
+    pub fn leave_group(ctx: Context<LeaveGroup>) -> Result<()> {
+        Ok(())
+    }
+    
+    pub fn kick_from_group(ctx: Context<KickFromGroup>) -> Result<()> {
+        Ok(())
+    }
+
+    pub fn rename_group(ctx: Context<RenameGroup>, title: Vec<u8>) -> Result<()> {
+        Ok(())
+    }
+    
+    pub fn close_group(ctx: Context<CloseGroup>) -> Result<()> {
+        Ok(())
+    }
 }
 
 #[derive(Accounts)]
@@ -220,7 +249,7 @@ pub struct Accept<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(_hash: [u8; 32], content: String)]
+#[instruction(_hash: [u8; 32], content: Vec<u8>)]
 pub struct SendMessage<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
@@ -231,16 +260,112 @@ pub struct SendMessage<'info> {
 }
 
 #[derive(Accounts)]
+#[instruction(title: Vec<u8>, description: Vec<u8>, image_url: Vec<u8>)]
 pub struct CreateGroup<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
     #[account(mut, seeds = [b"wallet_descriptor", payer.key().as_ref()], bump, realloc = 8 + 4 + (payer_descriptor.peers.len())*(32 + 1) + 4 + (payer_descriptor.groups.len() + 1) * ( 32 +1 ), realloc::payer = payer, realloc::zero = true)]
     pub payer_descriptor: Account<'info, WalletDescriptor>,
-    #[account(init, payer = payer, space = 8 + 4 + (0) + 4 + (0), seeds = [b"group_descriptor", payer.key().as_ref(), payer_descriptor.groups.len().to_le_bytes().as_ref()], bump)]
+    #[account(init, payer = payer, 
+        space = 8 // discriminator
+        + (4 + title.len()) // title length + title
+        + (4 + description.len()) // description length + description
+        + (4 + image_url.len()) // image_url length + image_url
+        + 32 // owner 
+        + 1 // group_type
+        + 1 // state
+        + 4 + (32 + 1) // one initial member (owner)
+        + 4 // messages full length 
+        + (4 + 0), // messages length + messages
+        seeds = [b"group_descriptor", payer.key().as_ref(), payer_descriptor.groups.len().to_le_bytes().as_ref()], bump)]
     pub group_descriptor: Account<'info, GroupDescriptor>,
     pub system_program: Program<'info, System>,
 }
 
+#[derive(Accounts)]
+pub struct InviteToGroup<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    /// CHECK: invitee is a public key
+    pub invitee: AccountInfo<'info>,
+    #[account(mut, seeds = [b"group_descriptor", payer.key().as_ref()], bump)]
+    pub group_descriptor: Account<'info, GroupDescriptor>,
+    #[account(mut, seeds = [b"wallet_descriptor", invitee.key().as_ref()], bump, realloc = 8 + 4 + (invitee_descriptor.peers.len() + 1)*(32) + 4 + (invitee_descriptor.groups.len()) * ( 32 +1 ), realloc::payer = payer, realloc::zero = true)]
+    pub invitee_descriptor: Account<'info, WalletDescriptor>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct AcceptInviteToGroup<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    #[account(mut, seeds = [b"group_descriptor", payer.key().as_ref()], bump)]
+    pub group_descriptor: Account<'info, GroupDescriptor>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct JoinGroup<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    #[account(mut, seeds = [b"group_descriptor", payer.key().as_ref()], bump)]
+    pub group_descriptor: Account<'info, GroupDescriptor>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct RejectInviteToGroup<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    #[account(mut, seeds = [b"group_descriptor", payer.key().as_ref()], bump)]
+    pub group_descriptor: Account<'info, GroupDescriptor>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct SendMessageToGroup<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    #[account(mut, seeds = [b"group_descriptor", payer.key().as_ref()], bump)]
+    pub group_descriptor: Account<'info, GroupDescriptor>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct LeaveGroup<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    #[account(mut, seeds = [b"group_descriptor", payer.key().as_ref()], bump)]
+    pub group_descriptor: Account<'info, GroupDescriptor>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct KickFromGroup<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    #[account(mut, seeds = [b"group_descriptor", payer.key().as_ref()], bump)]
+    pub group_descriptor: Account<'info, GroupDescriptor>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct RenameGroup<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    #[account(mut, seeds = [b"group_descriptor", payer.key().as_ref()], bump)]
+    pub group_descriptor: Account<'info, GroupDescriptor>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct CloseGroup<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    #[account(mut, seeds = [b"group_descriptor", payer.key().as_ref()], bump)]
+    pub group_descriptor: Account<'info, GroupDescriptor>,
+    pub system_program: Program<'info, System>,
+}
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq, Eq)]
 pub enum PeerState{
@@ -258,7 +383,7 @@ pub struct Peer {
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq, Eq)]
-pub enum GroupState{
+pub enum GroupPeerState{
     Invited = 0,
     Joined = 1,
     Rejected = 2,
@@ -269,7 +394,7 @@ pub enum GroupState{
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct Group {
     pub account: Pubkey,
-    pub state: GroupState,
+    pub state: GroupPeerState,
 }
 
 // WalletDescriptor is a descriptor for a wallet.
@@ -295,11 +420,27 @@ pub struct PrivateChat {
     pub messages: Vec<Message>,
 }
 
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq, Eq)]
+pub enum GroupType{
+    Private = 0,
+    Public = 1,
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq, Eq)]
+pub enum GroupState{
+    Active = 0,
+    Closed = 1
+}
+
 #[account]
 pub struct GroupDescriptor {
-    pub title: String,
+    pub title: Vec<u8>,
+    pub description: Vec<u8>,
+    pub image_url: Vec<u8>,
     pub owner: Pubkey,
-    pub members: Vec<Peer>,
+    pub group_type: GroupType,
+    pub state: GroupState,  
+    pub members: Vec<Group>,
     pub length: u32,
     pub messages: Vec<Message>
 }
