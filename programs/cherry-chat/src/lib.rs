@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use sha2::{Sha256, Digest};
+use anchor_lang::solana_program::hash::{hash, Hash};
 
 declare_id!("BjheWDpSQGu1VmY1MHQPzvyBZDWvAnfrnw55mHr33BRB");
 
@@ -34,10 +34,8 @@ fn get_hash(a: Pubkey, b: Pubkey) -> [u8; 32] {
         break;
     }
 
-    let hash = Sha256::digest(c);
-    let mut hash_array: [u8; 32] = [0; 32];
-    hash_array.copy_from_slice(&hash[..32]);
-    hash_array
+    let hash = hash(c.as_ref());
+    hash.to_bytes().try_into().unwrap()
 }
 
 #[program]
@@ -180,7 +178,7 @@ pub mod cherry_chat {
 
 #[derive(Accounts)]
 pub struct Register<'info> {
-    #[account(init, payer = payer, space = 8 + 4 + (0), seeds = [b"wallet_descriptor", payer.key().as_ref()], bump)]
+    #[account(init, payer = payer, space = 8 + 4 + (0) + 4 + (0), seeds = [b"wallet_descriptor", payer.key().as_ref()], bump)]
     pub wallet_descriptor: Account<'info, WalletDescriptor>,
     #[account(mut)]
     pub payer: Signer<'info>,
@@ -193,9 +191,9 @@ pub struct Invite<'info> {
     pub payer: Signer<'info>,
     /// CHECK: invitee is a public key
     pub invitee: AccountInfo<'info>,
-    #[account(mut, seeds = [b"wallet_descriptor", payer.key().as_ref()], bump, realloc = 8 + 4 + (payer_descriptor.peers.len() + 1)*(32 + 1), realloc::payer = payer, realloc::zero = true)]
+    #[account(mut, seeds = [b"wallet_descriptor", payer.key().as_ref()], bump, realloc = 8 + 4 + (payer_descriptor.peers.len() + 1)*(32 + 1) + 4 + (payer_descriptor.groups.len()) * ( 32 +1 ), realloc::payer = payer, realloc::zero = true)]
     pub payer_descriptor: Account<'info, WalletDescriptor>,
-    #[account(mut, seeds = [b"wallet_descriptor", invitee.key().as_ref()], bump, realloc = 8 + 4 + (invitee_descriptor.peers.len() + 1)*(32 + 1), realloc::payer = payer, realloc::zero = true)]
+    #[account(mut, seeds = [b"wallet_descriptor", invitee.key().as_ref()], bump, realloc = 8 + 4 + (invitee_descriptor.peers.len() + 1)*(32 + 1) + 4 + (invitee_descriptor.groups.len()) * ( 32 +1 ), realloc::payer = payer, realloc::zero = true)]
     pub invitee_descriptor: Account<'info, WalletDescriptor>,
     pub system_program: Program<'info, System>,
 }
