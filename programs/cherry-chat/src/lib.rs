@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use anchor_lang::solana_program::hash::{hash, Hash};
+use anchor_lang::solana_program::hash::{hash};
 
 declare_id!("BjheWDpSQGu1VmY1MHQPzvyBZDWvAnfrnw55mHr33BRB");
 
@@ -238,7 +238,16 @@ pub struct SendMessage<'info> {
 }
 
 #[derive(Accounts)]
-pub struct Initialize {}
+pub struct CreateGroup<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    #[account(mut, seeds = [b"wallet_descriptor", payer.key().as_ref()], bump, realloc = 8 + 4 + (payer_descriptor.peers.len())*(32 + 1) + 4 + (payer_descriptor.groups.len() + 1) * ( 32 +1 ), realloc::payer = payer, realloc::zero = true)]
+    pub payer_descriptor: Account<'info, WalletDescriptor>,
+    #[account(init, payer = payer, space = 8 + 4 + (0) + 4 + (0), seeds = [b"group_descriptor", payer.key().as_ref(), payer_descriptor.groups.len().to_le_bytes().as_ref()], bump)]
+    pub group_descriptor: Account<'info, GroupDescriptor>,
+    pub system_program: Program<'info, System>,
+}
+
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq, Eq)]
 pub enum PeerState{
@@ -281,7 +290,7 @@ pub struct WalletDescriptor {
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct Message{
     pub sender: Pubkey,
-    pub content: String,
+    pub content: Vec<u8>,
     pub timestamp: i64,
 }
 
@@ -294,7 +303,7 @@ pub struct PrivateChat {
 }
 
 #[account]
-pub struct GroupChat {
+pub struct GroupDescriptor {
     pub title: String,
     pub owner: Pubkey,
     pub members: Vec<Peer>,
