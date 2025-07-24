@@ -4,9 +4,17 @@ import {
   PublicKey,
 } from "@solana/web3.js";
 
-import type { AccountInfo, Commitment, Transaction as Web3Transaction } from "@solana/web3.js";
+import type {
+  AccountInfo,
+  Commitment,
+  Transaction,
+  VersionedTransaction,
+  Transaction as Web3Transaction,
+} from "@solana/web3.js";
 
-import { EventEmitter } from "events";
+import { Buffer } from 'buffer';
+
+import { EventEmitter } from "./events";
 
 /**
  * Account class
@@ -122,9 +130,9 @@ export class Connection {
     // this._commitment = commitment;
   }
 
-  getAccount(publicKey: PublicKey, subscribe: boolean = false) {
+  async getAccount(publicKey: PublicKey, subscribe: boolean = false) {
     const account = new Account(publicKey, this._connection, subscribe);
-    account.fetch();
+    await account.fetch();
     return account;
   }
 
@@ -139,6 +147,37 @@ export class Connection {
     );
     return new Signature(signature, this._connection);
   }
+
+  async getLatestBlockhashAndContext() {
+    return await this._connection.getLatestBlockhashAndContext();
+  }
+
+  async getMinContextSlot() {
+    const {
+      context: { slot: minContextSlot },
+    } = await this.getLatestBlockhashAndContext();
+    return minContextSlot;
+  }
+
+  async getLatestBlockhash() {
+    return await this._connection.getLatestBlockhash();
+  }
+
+  async sendTransaction(tx: VersionedTransaction) {
+    const {
+      context: { slot: minContextSlot },
+    } = await this.getLatestBlockhashAndContext();
+    const signature = await this._connection.sendTransaction(tx, {
+      minContextSlot,
+    });
+    return new Signature(signature, this._connection);
+  }
+
+
+  // async sendTransaction(tx: Web3Transaction) {
+  //   const signature = await this._connection.sendTransaction(tx);
+  //   return new Signature(signature, this._connection);
+  // }
 }
 
 export class Signature {
@@ -209,7 +248,9 @@ export class Signature {
   }
 
   async fetch() {
-    const signatureResult = await this._connection.getSignatureStatus(this._signature);
+    const signatureResult = await this._connection.getSignatureStatus(
+      this._signature
+    );
     console.log("SOLANA: Signature fetched", signatureResult);
     this._update(signatureResult.value);
     this._isInitialized = true;
@@ -219,7 +260,6 @@ export class Signature {
   }
 
   confirm(commitment: Commitment = "finalized") {
-
     return new Promise(async (resolve, reject) => {
       if (!this._isInitialized) {
         await this.fetch();
@@ -233,13 +273,17 @@ export class Signature {
           reject(signature.err);
           this._emitter?.off("update", updateListener);
         }
-      }
+      };
       this._emitter?.on("update", updateListener);
 
-      this._connection.onSignature(this._signature, async () => {
-        await this.fetch();
-        this._emitter?.emit("update", this);
-      }, commitment);
+      this._connection.onSignature(
+        this._signature,
+        async () => {
+          await this.fetch();
+          this._emitter?.emit("update", this);
+        },
+        commitment
+      );
     });
   }
 }

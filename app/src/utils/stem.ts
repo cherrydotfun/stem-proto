@@ -1,12 +1,16 @@
 import {
   PublicKey,
-  Transaction,
   TransactionInstruction,
   SystemProgram,
+  VersionedTransaction,
+  TransactionMessage,
 } from "@solana/web3.js";
-import { createHash } from "crypto";
+
+import * as CryptoJS from 'crypto-js';
 import * as borsh from "borsh";
-import { EventEmitter } from "events";
+import { Buffer } from 'buffer';
+
+import { EventEmitter } from "./events";
 
 import { Account, Connection } from "./solana";
 import { ChatSchema, DescriptorSchema } from "./schemas";
@@ -15,10 +19,19 @@ import { PeerStatus } from "./types";
 
 import { PROGRAM_ID, SEED_DESCRIPTOR, SEED_PRIVATE_CHAT } from "./const";
 
+const getHash = async (data: Buffer | string) => {
+  if (typeof data === 'string') {
+    const hash = CryptoJS.SHA256(data);
+    return  Buffer.from(hash.toString(CryptoJS.enc.Hex), 'hex');
+  }
+  const wordArray = CryptoJS.lib.WordArray.create(data);
+  const hash = CryptoJS.SHA256(wordArray);
+  return  Buffer.from(hash.toString(CryptoJS.enc.Hex), 'hex');
+};
+
 
 export const helpers = {
-  getdisc: (name: string) =>
-    createHash("sha256").update(`global:${name}`).digest().subarray(0, 8),
+  getdisc: async (name: string) => (await getHash(Buffer.from(`global:${name}`))).subarray(0, 8),
 
   getDescriptorPda: (publicKey: PublicKey) => {
     const [descriptorPda] = PublicKey.findProgramAddressSync(
@@ -43,11 +56,11 @@ export const helpers = {
       break;
     }
 
-    return createHash("sha256").update(raw).digest();
+    return getHash(raw);
   },
-  getChatPda: (publicKey: PublicKey, peer: PublicKey) => {
+  getChatPda: async (publicKey: PublicKey, peer: PublicKey) => {
     const [chatPda] = PublicKey.findProgramAddressSync(
-      [SEED_PRIVATE_CHAT, helpers.getChatHash(publicKey, peer).subarray(0, 64)],
+      [SEED_PRIVATE_CHAT, await helpers.getChatHash(publicKey, peer)],
       PROGRAM_ID
     );
     return chatPda;
@@ -59,6 +72,12 @@ type PeerAccount = {
   status: PeerStatus;
 };
 
+type ChatMetadata = Record<string, {
+  lastMessage: string;
+  timestamp: string;
+  lastMessageSender: string;
+}>;
+
 export class Stem {
   private _publicKey: PublicKey;
   private _connection: Connection;
@@ -67,6 +86,7 @@ export class Stem {
   private _isRegistered: boolean;
   private _isLoaded: boolean;
   private _subscribe: boolean;
+  private _metadata: ChatMetadata = {};
 
   private _emitter: EventEmitter = new EventEmitter();
 
@@ -87,9 +107,11 @@ export class Stem {
     this._isRegistered = false;
     this._isLoaded = false;
 
-    // bind
-    console.log("Binding _parseAndUpdatePeers");
     this._parseAndUpdatePeers = this._parseAndUpdatePeers.bind(this);
+  }
+
+  get connection() {
+    return this._connection;
   }
 
   get isLoaded() {
@@ -103,8 +125,12 @@ export class Stem {
     return this._isRegistered;
   }
 
+  get publicKey() {
+    return this._publicKey;
+  }
+
   async _parseAndUpdatePeers() {
-    console.log("Stem._parseAndUpdatePeers()");
+    // console.log("Stem._parseAndUpdatePeers()");
 
     let statusUpdated = false;
     let chatListUpdated = false;
@@ -142,14 +168,15 @@ export class Stem {
 
         // only accepted peer has chat account
         if (peer.status === PeerStatus.Accepted && !obj?.account) {
+          const chatPda = await helpers.getChatPda(this._publicKey, peerPubKey);
           const account = new Account(
-            helpers.getChatPda(this._publicKey, peerPubKey),
+            chatPda,
             this._connection.connection,
             this._subscribe
           );
           if (this._subscribe) {
             account.onUpdate(() => {
-              console.log("STEM: Chat updated", account.data);
+              console.log("STEM: Chat updated", this._parseChat(account));
               this._emitter.emit("onChatUpdated", {
                 pubkey: peerPubKey,
                 chat: this._parseChat(account),
@@ -190,7 +217,6 @@ export class Stem {
   }
 
   async init() {
-    // load descriptor account
     await this._descriptorAccount.fetch();
     await this._parseAndUpdatePeers();
 
@@ -198,18 +224,38 @@ export class Stem {
       this._descriptorAccount.onUpdate(this._parseAndUpdatePeers);
     }
 
-    // load chats accounts
-
     this._isLoaded = true;
+    console.log('Stem is loaded');
+
+    this._emitter.emit("onChatsUpdated", this);
+
+    this._emitter.on("onChatUpdated", (chat) => {
+      this._metadata[chat.pubkey.toString()] = {
+        lastMessage: chat.chat.messages[chat.chat.messages.length - 1]?.content,
+        timestamp: chat.chat.messages[chat.chat.messages.length - 1]?.timestamp,
+        lastMessageSender: chat.chat.messages[chat.chat.messages.length - 1]?.sender.toString(),
+      };
+      this._emitter.emit("onChatsUpdated", this);
+    });
+
     return this;
   }
 
   get chats() {
+    if (!this._isLoaded) {
+      return [];
+    }
+
     return Array.from(this._chatsAccounts.keys()).map((pubKeyString) => {
       const pubKey = new PublicKey(pubKeyString);
+      // const chat = this._chatsAccounts.get(pubKeyString)?.account;
+      // const chat = this.getChat(pubKey);
       return {
         pubkey: pubKey,
         status: this._chatsAccounts.get(pubKeyString)?.status,
+        lastMessage: this._metadata[pubKeyString]?.lastMessage,
+        timestamp: this._metadata[pubKeyString]?.timestamp,
+        lastMessageSender: this._metadata[pubKeyString]?.lastMessageSender,
       };
     });
   }
@@ -225,7 +271,7 @@ export class Stem {
       length: chat.length,
       messages: chat.messages.map((message) => ({
         sender: new PublicKey(message.sender),
-        content: message.content.toString(),
+        content: message.content,
         timestamp: new Date(
           Buffer.from(message.timestamp.slice(0, 4)).readUint32LE() * 1000
         ),
@@ -270,7 +316,7 @@ export class Stem {
       throw Error("Stem Account already registred");
     }
 
-    const descriptorPda = helpers.getDescriptorPda(this._publicKey);
+    const descriptorPda = await helpers.getDescriptorPda(this._publicKey);
 
     if (!descriptorPda) {
       throw new Error("Descriptor PDA not generated");
@@ -295,10 +341,18 @@ export class Stem {
           isWritable: false,
         },
       ],
-      data: helpers.getdisc("register"),
+      data: await helpers.getdisc("register"),
     });
 
-    const tx = new Transaction().add(ix);
+    const blockhash = await this._connection.getLatestBlockhash();
+
+    const txMessage  = new TransactionMessage({
+      payerKey: this._publicKey,
+      recentBlockhash: blockhash.blockhash,
+      instructions: [ix],
+    }).compileToV0Message();
+
+    const tx = new VersionedTransaction(txMessage);
 
     return tx;
   }
@@ -315,8 +369,8 @@ export class Stem {
       throw Error("Peer already invited");
     }
 
-    const inviterPda = helpers.getDescriptorPda(this._publicKey);
-    const inviteePda = helpers.getDescriptorPda(invitee);
+    const inviterPda = await helpers.getDescriptorPda(this._publicKey);
+    const inviteePda = await helpers.getDescriptorPda(invitee);
 
     if (!inviterPda || !inviteePda) {
       throw new Error("Descriptor PDA not generated");
@@ -354,10 +408,19 @@ export class Stem {
           isWritable: false,
         },
       ],
-      data: helpers.getdisc("invite"),
+      data: await helpers.getdisc("invite"),
     });
 
-    const tx = new Transaction().add(ix);
+    const blockhash = await this._connection.getLatestBlockhash();
+
+    const txMessage  = new TransactionMessage({
+      payerKey: this._publicKey,
+      recentBlockhash: blockhash.blockhash,
+      instructions: [ix],
+    }).compileToV0Message();
+
+    const tx = new VersionedTransaction(txMessage);
+
     return tx;
   }
   async createAcceptTx(invitee: PublicKey) {
@@ -376,8 +439,8 @@ export class Stem {
       throw Error("Peer not invited");
     }
 
-    const inviterPda = helpers.getDescriptorPda(this._publicKey);
-    const inviteePda = helpers.getDescriptorPda(invitee);
+    const inviterPda = await helpers.getDescriptorPda(this._publicKey);
+    const inviteePda = await helpers.getDescriptorPda(invitee);
 
     if (!inviterPda || !inviteePda) {
       throw new Error("Descriptor PDA not generated");
@@ -386,6 +449,9 @@ export class Stem {
     if (this._publicKey.toBase58() === invitee.toBase58()) {
       throw new Error("You can't invite yourself");
     }
+
+    console.log( await helpers.getdisc("accept"),);
+    console.log(await helpers.getChatHash(this._publicKey, invitee),);
 
     const ix = new TransactionInstruction({
       programId: PROGRAM_ID,
@@ -411,7 +477,7 @@ export class Stem {
           isWritable: true,
         },
         {
-          pubkey: helpers.getChatPda(this._publicKey, invitee),
+          pubkey: await helpers.getChatPda(this._publicKey, invitee),
           isSigner: false,
           isWritable: true,
         },
@@ -422,12 +488,20 @@ export class Stem {
         },
       ],
       data: Buffer.concat([
-        Buffer.from(helpers.getdisc("accept")),
-        helpers.getChatHash(this._publicKey, invitee),
+        await helpers.getdisc("accept"),
+        await helpers.getChatHash(this._publicKey, invitee),
       ]),
     });
 
-    const tx = new Transaction().add(ix);
+    const blockhash = await this._connection.getLatestBlockhash();
+
+    const txMessage  = new TransactionMessage({
+      payerKey: this._publicKey,
+      recentBlockhash: blockhash.blockhash,
+      instructions: [ix],
+    }).compileToV0Message();
+
+    const tx = new VersionedTransaction(txMessage);
     return tx;
   }
   async createRejectTx(invitee: PublicKey) {
@@ -446,8 +520,8 @@ export class Stem {
       throw Error("Peer not invited");
     }
 
-    const inviterPda = helpers.getDescriptorPda(this._publicKey);
-    const inviteePda = helpers.getDescriptorPda(invitee);
+    const inviterPda = await helpers.getDescriptorPda(this._publicKey);
+    const inviteePda = await helpers.getDescriptorPda(invitee);
 
     if (!inviterPda || !inviteePda) {
       throw new Error("Descriptor PDA not generated");
@@ -481,10 +555,19 @@ export class Stem {
           isWritable: true,
         },
       ],
-      data: helpers.getdisc("reject"),
+      data: await helpers.getdisc("reject"),
     });
 
-    const tx = new Transaction().add(ix);
+    const blockhash = await this._connection.getLatestBlockhash();
+
+    const txMessage  = new TransactionMessage({
+      payerKey: this._publicKey,
+      recentBlockhash: blockhash.blockhash,
+      instructions: [ix],
+    }).compileToV0Message();
+
+    const tx = new VersionedTransaction(txMessage);
+
     return tx;
   }
   async createSendMessageTx(invitee: PublicKey, message: string) {
@@ -515,7 +598,7 @@ export class Stem {
           isWritable: false,
         },
         {
-          pubkey: helpers.getChatPda(this._publicKey, invitee),
+          pubkey: await helpers.getChatPda(this._publicKey, invitee),
           isSigner: false,
           isWritable: true,
         },
@@ -526,14 +609,24 @@ export class Stem {
         },
       ],
       data: Buffer.concat([
-        Buffer.from(helpers.getdisc("sendmessage")),
-        helpers.getChatHash(this._publicKey, invitee),
+        await helpers.getdisc("sendmessage"),
+        await helpers.getChatHash(this._publicKey, invitee),
         buf,
         Buffer.from(message),
       ]),
     });
 
-    const tx = new Transaction().add(ix);
+    const blockhash = await this._connection.getLatestBlockhash();
+
+    const txMessage  = new TransactionMessage({
+      payerKey: this._publicKey,
+      recentBlockhash: blockhash.blockhash,
+      instructions: [ix],
+    }).compileToV0Message();
+
+    const tx = new VersionedTransaction(txMessage);
+
     return tx;
   }
+
 }

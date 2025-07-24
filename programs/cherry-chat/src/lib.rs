@@ -46,8 +46,8 @@ fn get_hash(a: Pubkey, b: Pubkey) -> [u8; 32] {
         break;
     }
 
-    let hash = hash(c.as_ref());
-    hash.to_bytes().try_into().unwrap()
+    let h = hash(c.as_ref());
+    h.to_bytes().try_into().unwrap()
 }
 
 #[program]
@@ -89,8 +89,10 @@ pub mod cherry_chat {
 
         require!(me_descriptor.peers.iter().find(|p| p.wallet == peer.key() && p.state == PeerState::Requested).is_some(), ErrorCode::NotRequested);
         require!(peer_descriptor.peers.iter().find(|p| p.wallet == me.key() && p.state == PeerState::Invited).is_some(), ErrorCode::NotInvited);
-
+        
         let hash = get_hash(me.key(), peer.key());
+        msg!("Hash: {:?}", hash);
+        msg!("Hash_: {:?}", _hash);
         require!(hash == _hash, ErrorCode::InvalidHash);
 
         for p in me_descriptor.peers.iter_mut() {

@@ -53,9 +53,20 @@ export type Chat = {
   readonly messages: Message[];
 };
 
+
+export type ChatListItem = {
+  pubkey: PublicKey;
+  status: PeerStatus | undefined;
+  lastMessage: string | undefined;
+  timestamp: Date | undefined;
+  lastMessageSender: string | undefined;
+}[]
+
+export type ChatList =ChatListItem[];
+
 export type MessageBorsh = {
   readonly sender: Uint8Array;
-  readonly content: Uint8Array;
+  readonly content: string;
   readonly timestamp: Uint8Array;
 };
 
