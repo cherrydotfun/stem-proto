@@ -17,6 +17,16 @@ pub enum ErrorCode {
     InvalidHash,
     #[msg("Already in group")]
     AlreadyInGroup,
+    #[msg("You are not owner")]
+    YouAreNotOwner,
+    #[msg("Not in group")]
+    NotInGroup,
+    #[msg("Owner cannot leave")]
+    OwnerCannotLeave,
+    #[msg("Group is not active")]
+    GroupIsNotActive,
+    #[msg("Group is not public")]
+    GroupIsNotPublic,
 }
 
 fn get_hash(a: Pubkey, b: Pubkey) -> [u8; 32] {
@@ -158,7 +168,7 @@ pub mod cherry_chat {
         Ok(())
     }
 
-    pub fn create_group(ctx: Context<CreateGroup>, title: Vec<u8>, description: Vec<u8>, image_url: Vec<u8>) -> Result<()> {
+    pub fn create_group(ctx: Context<CreateGroup>, group_type: GroupType, title: Vec<u8>, description: Vec<u8>, image_url: Vec<u8>) -> Result<()> {
         let payer = &mut ctx.accounts.payer;
         let payer_descriptor = &mut ctx.accounts.payer_descriptor;
         let group_descriptor = &mut ctx.accounts.group_descriptor;
@@ -169,7 +179,7 @@ pub mod cherry_chat {
         group_descriptor.description = description;
         group_descriptor.image_url = image_url;
         group_descriptor.owner = payer.key();
-        group_descriptor.group_type = GroupType::Private;
+        group_descriptor.group_type = group_type;
         group_descriptor.state = GroupState::Active;
         group_descriptor.members.push(Group {
             account: payer.key(),
@@ -186,40 +196,213 @@ pub mod cherry_chat {
         Ok(())
     }
 
-    pub fn invite_to_group(ctx: Context<InviteToGroup>, ) -> Result<()> {
+    pub fn invite_to_group(ctx: Context<InviteToGroup>, invitee: Pubkey) -> Result<()> {
+        let payer = &mut ctx.accounts.payer;
+        let group_descriptor = &mut ctx.accounts.group_descriptor;
+        let invitee_descriptor = &mut ctx.accounts.invitee_descriptor;
+
+        require!(group_descriptor.state == GroupState::Active, ErrorCode::GroupIsNotActive);
+        require!(group_descriptor.owner == payer.key(), ErrorCode::YouAreNotOwner);
+        require!(group_descriptor.members.iter().all(|g| g.account != invitee), ErrorCode::AlreadyInGroup);
+        require!(invitee_descriptor.groups.iter().all(|g| g.account != group_descriptor.key()), ErrorCode::AlreadyInGroup);
+
+        invitee_descriptor.groups.push(Group {
+            account: group_descriptor.key(),
+            state: GroupPeerState::Invited,
+        });
+
+        group_descriptor.members.push(Group {
+            account: invitee,
+            state: GroupPeerState::Invited,
+        });
+
+        msg!("Invite to group: {:?}", group_descriptor.key());
+
         Ok(())
     }
 
-    pub fn join_group(ctx: Context<JoinGroup>) -> Result<()> {
-        Ok(())
-    }
-
+    
     pub fn accept_invite_to_group(ctx: Context<AcceptInviteToGroup>) -> Result<()> {
-        Ok(())
-    }
-    
-    pub fn reject_invite_to_group(ctx: Context<RejectInviteToGroup>) -> Result<()> {
-        Ok(())
-    }
+        let payer = &mut ctx.accounts.payer;
+        let group_descriptor = &mut ctx.accounts.group_descriptor;
+        let payer_descriptor = &mut ctx.accounts.payer_descriptor;
 
-    
-    pub fn send_message_to_group(ctx: Context<SendMessageToGroup>, content: Vec<u8>) -> Result<()> {
+        require!(group_descriptor.state == GroupState::Active, ErrorCode::GroupIsNotActive);
+        require!(payer_descriptor.groups.iter().find(|g| g.account == payer.key() && g.state == GroupPeerState::Invited).is_some(), ErrorCode::NotInvited);
+        require!(group_descriptor.members.iter().find(|m| m.account == group_descriptor.key() && m.state == GroupPeerState::Invited).is_some(), ErrorCode::NotInvited);
+
+        for g in payer_descriptor.groups.iter_mut() {
+            if g.account == group_descriptor.key() {
+                g.state = GroupPeerState::Joined;
+                break;
+            }
+        }
+        for m in group_descriptor.members.iter_mut() {
+            if m.account == payer.key() {
+                m.state = GroupPeerState::Joined;
+                break;
+            }
+        }
+
+        msg!("Accept invite to group: {:?}", group_descriptor.key());
+
         Ok(())
     }
+        
+    pub fn reject_invite_to_group(ctx: Context<RejectInviteToGroup>) -> Result<()> {
+        let payer = &mut ctx.accounts.payer;
+        let group_descriptor = &mut ctx.accounts.group_descriptor;
+        let payer_descriptor = &mut ctx.accounts.payer_descriptor;
+
+        require!(group_descriptor.state == GroupState::Active, ErrorCode::GroupIsNotActive);
+        require!(payer_descriptor.groups.iter().find(|g| g.account == payer.key() && g.state == GroupPeerState::Invited).is_some(), ErrorCode::NotInvited);
+        require!(group_descriptor.members.iter().find(|m| m.account == group_descriptor.key() && m.state == GroupPeerState::Invited).is_some(), ErrorCode::NotInvited);
+
+        for g in payer_descriptor.groups.iter_mut() {
+            if g.account == group_descriptor.key() {
+                g.state = GroupPeerState::Rejected;
+                break;
+            }
+        }
+        for m in group_descriptor.members.iter_mut() {
+            if m.account == payer.key() {
+                m.state = GroupPeerState::Rejected;
+                break;
+            }
+        }
+
+        msg!("Reject invite to group: {:?}", group_descriptor.key());
+
+        Ok(())
+    }
+            
+            
+    pub fn send_message_to_group(ctx: Context<SendMessageToGroup>, content: Vec<u8>) -> Result<()> {
+        let payer = &mut ctx.accounts.payer;
+        let group_descriptor = &mut ctx.accounts.group_descriptor;
+
+        require!(group_descriptor.state == GroupState::Active, ErrorCode::GroupIsNotActive);
+        require!(group_descriptor.members.iter().find(|m| m.account == payer.key() && m.state == GroupPeerState::Joined).is_some(), ErrorCode::NotInGroup);
+
+        let current_timestamp = Clock::get().unwrap().unix_timestamp;
+
+        group_descriptor.messages.push(Message {
+            sender: payer.key(),
+            content,
+            timestamp: current_timestamp,
+        });
+
+        let message_length = 32 + 4 + group_descriptor.messages.last().unwrap().content.len() as u32 + 8;
+        group_descriptor.length += message_length;
+
+        msg!("Send message to group: {:?}", group_descriptor.key());
+
+        Ok(())
+    }
+                
 
     pub fn leave_group(ctx: Context<LeaveGroup>) -> Result<()> {
+        let payer = &mut ctx.accounts.payer;
+        let group_descriptor = &mut ctx.accounts.group_descriptor;
+        let payer_descriptor = &mut ctx.accounts.payer_descriptor;
+
+        require!(group_descriptor.state == GroupState::Active, ErrorCode::GroupIsNotActive);
+        require!(group_descriptor.owner != payer.key(), ErrorCode::OwnerCannotLeave);
+        require!(payer_descriptor.groups.iter().find(|g| g.account == group_descriptor.key() && g.state == GroupPeerState::Joined).is_some(), ErrorCode::NotInGroup);
+        require!(group_descriptor.members.iter().find(|m| m.account == payer.key() && m.state == GroupPeerState::Joined).is_some(), ErrorCode::NotInGroup);
+
+        for g in payer_descriptor.groups.iter_mut() {
+            if g.account == group_descriptor.key() {
+                g.state = GroupPeerState::Left;
+                break;
+            }
+        }
+        for m in group_descriptor.members.iter_mut() {
+            if m.account == payer.key() {
+                m.state = GroupPeerState::Left;
+                break;
+            }
+        }
+
+        msg!("Leave group: {:?}", group_descriptor.key());
+
         Ok(())
     }
     
-    pub fn kick_from_group(ctx: Context<KickFromGroup>) -> Result<()> {
+    pub fn kick_from_group(ctx: Context<KickFromGroup>, target: Pubkey) -> Result<()> {
+        let payer = &mut ctx.accounts.payer;
+        let group_descriptor = &mut ctx.accounts.group_descriptor;
+        let target_descriptor = &mut ctx.accounts.target_descriptor;
+
+        require!(group_descriptor.owner == payer.key(), ErrorCode::YouAreNotOwner);
+        require!(group_descriptor.state == GroupState::Active, ErrorCode::GroupIsNotActive);
+        require!(target_descriptor.groups.iter().find(|g| g.account == group_descriptor.key() && g.state == GroupPeerState::Joined).is_some(), ErrorCode::NotInGroup);
+        require!(group_descriptor.members.iter().find(|m| m.account == target && m.state == GroupPeerState::Joined).is_some(), ErrorCode::NotInGroup); 
+
+        for m in group_descriptor.members.iter_mut() {
+            if m.account == target {
+                m.state = GroupPeerState::Kicked;
+                break;
+            }
+        }
+
+        for g in target_descriptor.groups.iter_mut() {
+            if g.account == group_descriptor.key() {
+                g.state = GroupPeerState::Kicked;
+                break;
+            }
+        }
+
+        msg!("Kick from group: {:?}", group_descriptor.key());
+
         Ok(())
     }
 
     pub fn rename_group(ctx: Context<RenameGroup>, title: Vec<u8>) -> Result<()> {
+        let payer = &mut ctx.accounts.payer;
+        let group_descriptor = &mut ctx.accounts.group_descriptor;
+
+        require!(group_descriptor.owner == payer.key(), ErrorCode::YouAreNotOwner);
+        require!(group_descriptor.state == GroupState::Active, ErrorCode::GroupIsNotActive);
+
+        group_descriptor.title = title;
+
+        Ok(())
+    }
+
+    pub fn close_group(ctx: Context<CloseGroup>) -> Result<()> {
+        let payer = &mut ctx.accounts.payer;
+        let group_descriptor = &mut ctx.accounts.group_descriptor;
+
+        require!(group_descriptor.owner == payer.key(), ErrorCode::YouAreNotOwner);
+        require!(group_descriptor.state == GroupState::Active, ErrorCode::GroupIsNotActive);
+
+        group_descriptor.state = GroupState::Closed;
+
         Ok(())
     }
     
-    pub fn close_group(ctx: Context<CloseGroup>) -> Result<()> {
+    pub fn join_group(ctx: Context<JoinGroup>) -> Result<()> {
+        let payer = &mut ctx.accounts.payer;
+        let group_descriptor = &mut ctx.accounts.group_descriptor;
+        let payer_descriptor = &mut ctx.accounts.payer_descriptor;
+
+        require!(group_descriptor.state == GroupState::Active, ErrorCode::GroupIsNotActive);
+        require!(group_descriptor.group_type == GroupType::Public, ErrorCode::GroupIsNotPublic);
+
+        require!(payer_descriptor.groups.iter().find(|g| g.account == group_descriptor.key()).is_some(), ErrorCode::NotInvited);
+        require!(group_descriptor.members.iter().find(|m| m.account == payer.key()).is_some(), ErrorCode::AlreadyInGroup);
+
+        group_descriptor.members.push(Group {
+            account: payer.key(),
+            state: GroupPeerState::Joined,
+        });
+
+        payer_descriptor.groups.push(Group {
+            account: group_descriptor.key(),
+            state: GroupPeerState::Joined,
+        });
+
         Ok(())
     }
 }
@@ -292,31 +475,30 @@ pub struct CreateGroup<'info> {
     pub payer: Signer<'info>,
     #[account(mut, seeds = [b"wallet_descriptor", payer.key().as_ref()], bump, realloc = 8 + 4 + (payer_descriptor.peers.len())*(32 + 1) + 4 + (payer_descriptor.groups.len() + 1) * ( 32 +1 ), realloc::payer = payer, realloc::zero = true)]
     pub payer_descriptor: Account<'info, WalletDescriptor>,
-    #[account(init, payer = payer, 
-        space = 8 // discriminator
-        + (4 + title.len()) // title length + title
-        + (4 + description.len()) // description length + description
-        + (4 + image_url.len()) // image_url length + image_url
-        + 32 // owner 
-        + 1 // group_type
-        + 1 // state
-        + 4 + (32 + 1) // one initial member (owner)
-        + 4 // messages full length 
-        + (4 + 0), // messages length + messages
-        seeds = [b"group_descriptor", payer.key().as_ref(), payer_descriptor.groups.len().to_le_bytes().as_ref()], bump)]
+    #[account(init, 
+        payer = payer, 
+        space = group_create_gd_realloc!(title, description, image_url),
+        seeds = [b"group_descriptor", payer.key().as_ref(), payer_descriptor.groups.len().to_le_bytes().as_ref()],
+        bump)]
     pub group_descriptor: Account<'info, GroupDescriptor>,
     pub system_program: Program<'info, System>,
 }
 
 #[derive(Accounts)]
+#[instruction(invitee: Pubkey)]
 pub struct InviteToGroup<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
-    /// CHECK: invitee is a public key
-    pub invitee: AccountInfo<'info>,
-    #[account(mut, seeds = [b"group_descriptor", payer.key().as_ref()], bump)]
+
+    #[account(mut,
+        realloc = group_invite_gd_realloc!(group_descriptor), realloc::payer = payer, realloc::zero = true)]
     pub group_descriptor: Account<'info, GroupDescriptor>,
-    #[account(mut, seeds = [b"wallet_descriptor", invitee.key().as_ref()], bump, realloc = 8 + 4 + (invitee_descriptor.peers.len() + 1)*(32) + 4 + (invitee_descriptor.groups.len()) * ( 32 +1 ), realloc::payer = payer, realloc::zero = true)]
+
+    #[account(mut, seeds = [b"wallet_descriptor", invitee.as_ref()], bump, 
+        realloc = 8 // discriminator
+        + 4 + (invitee_descriptor.peers.len())*(32) 
+        + 4 + (invitee_descriptor.groups.len() + 1) * ( 32 + 1 )
+    , realloc::payer = payer, realloc::zero = true)]
     pub invitee_descriptor: Account<'info, WalletDescriptor>,
     pub system_program: Program<'info, System>,
 }
@@ -325,17 +507,10 @@ pub struct InviteToGroup<'info> {
 pub struct AcceptInviteToGroup<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
-    #[account(mut, seeds = [b"group_descriptor", payer.key().as_ref()], bump)]
-    pub group_descriptor: Account<'info, GroupDescriptor>,
-    pub system_program: Program<'info, System>,
-}
-
-#[derive(Accounts)]
-pub struct JoinGroup<'info> {
     #[account(mut)]
-    pub payer: Signer<'info>,
-    #[account(mut, seeds = [b"group_descriptor", payer.key().as_ref()], bump)]
     pub group_descriptor: Account<'info, GroupDescriptor>,
+    #[account(mut, seeds = [b"wallet_descriptor", payer.key().as_ref()], bump)]
+    pub payer_descriptor: Account<'info, WalletDescriptor>,
     pub system_program: Program<'info, System>,
 }
 
@@ -343,8 +518,10 @@ pub struct JoinGroup<'info> {
 pub struct RejectInviteToGroup<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
-    #[account(mut, seeds = [b"group_descriptor", payer.key().as_ref()], bump)]
+    #[account(mut)]
     pub group_descriptor: Account<'info, GroupDescriptor>,
+    #[account(mut, seeds = [b"wallet_descriptor", payer.key().as_ref()], bump)]
+    pub payer_descriptor: Account<'info, WalletDescriptor>,
     pub system_program: Program<'info, System>,
 }
 
@@ -352,7 +529,7 @@ pub struct RejectInviteToGroup<'info> {
 pub struct SendMessageToGroup<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
-    #[account(mut, seeds = [b"group_descriptor", payer.key().as_ref()], bump)]
+    #[account(mut)]
     pub group_descriptor: Account<'info, GroupDescriptor>,
     pub system_program: Program<'info, System>,
 }
@@ -361,25 +538,32 @@ pub struct SendMessageToGroup<'info> {
 pub struct LeaveGroup<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
-    #[account(mut, seeds = [b"group_descriptor", payer.key().as_ref()], bump)]
+    #[account(mut, seeds = [b"wallet_descriptor", payer.key().as_ref()], bump)]
+    pub payer_descriptor: Account<'info, WalletDescriptor>,
+    #[account(mut)]
     pub group_descriptor: Account<'info, GroupDescriptor>,
     pub system_program: Program<'info, System>,
 }
 
 #[derive(Accounts)]
+#[instruction(target: Pubkey)]
 pub struct KickFromGroup<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
-    #[account(mut, seeds = [b"group_descriptor", payer.key().as_ref()], bump)]
+    #[account(mut, seeds = [b"wallet_descriptor", target.as_ref()], bump)]
+    pub target_descriptor: Account<'info, WalletDescriptor>,
+    #[account(mut)]
     pub group_descriptor: Account<'info, GroupDescriptor>,
     pub system_program: Program<'info, System>,
 }
 
 #[derive(Accounts)]
+#[instruction(title: Vec<u8>)]
 pub struct RenameGroup<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
-    #[account(mut, seeds = [b"group_descriptor", payer.key().as_ref()], bump)]
+    #[account(mut, 
+        realloc = group_rename_gd_realloc!(group_descriptor, title), realloc::payer = payer, realloc::zero = true)]
     pub group_descriptor: Account<'info, GroupDescriptor>,
     pub system_program: Program<'info, System>,
 }
@@ -388,10 +572,22 @@ pub struct RenameGroup<'info> {
 pub struct CloseGroup<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
-    #[account(mut, seeds = [b"group_descriptor", payer.key().as_ref()], bump)]
+    #[account(mut)]
     pub group_descriptor: Account<'info, GroupDescriptor>,
     pub system_program: Program<'info, System>,
 }
+
+#[derive(Accounts)]
+pub struct JoinGroup<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    #[account(mut, seeds = [b"wallet_descriptor", payer.key().as_ref()], bump)]
+    pub payer_descriptor: Account<'info, WalletDescriptor>,
+    #[account(mut)]
+    pub group_descriptor: Account<'info, GroupDescriptor>,
+    pub system_program: Program<'info, System>,
+}
+
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq, Eq)]
 pub enum PeerState{
@@ -469,4 +665,52 @@ pub struct GroupDescriptor {
     pub members: Vec<Group>,
     pub length: u32,
     pub messages: Vec<Message>
+}
+
+#[macro_export]
+macro_rules! group_create_gd_realloc {
+    ($title:expr, $description:expr, $image_url:expr) => {
+        8 // discriminator
+        + (4 + $title.len()) // title length + title
+        + (4 + $description.len()) // description length + description
+        + (4 + $image_url.len()) // image_url length + image_url
+        + 32 // owner 
+        + 1 // group_type
+        + 1 // state
+        + 4 + (1) * (32 + 1) // one initial member (owner)
+        + 4 // messages full length 
+        + (4 + 0) // messages length + messages
+    }
+}
+
+#[macro_export]
+macro_rules! group_invite_gd_realloc {
+    ($group_descriptor:expr) => {
+        8 // discriminator
+        + (4 + $group_descriptor.title.len()) // title length + title
+        + (4 + $group_descriptor.description.len()) // description length + description
+        + (4 + $group_descriptor.image_url.len()) // image_url length + image_url
+        + 32 // owner 
+        + 1 // group_type
+        + 1 // state
+        + 4 + ($group_descriptor.members.len() + 1) * (32 + 1) // one initial member (owner)
+        + 4 // messages full length 
+        + (4 + 0) // messages length + messages
+    }
+}
+
+#[macro_export]
+macro_rules! group_rename_gd_realloc {
+    ($group_descriptor:expr, $title:expr) => {
+        8 // discriminator
+        + (4 + $title.len()) // title length + title
+        + (4 + $group_descriptor.description.len()) // description length + description
+        + (4 + $group_descriptor.image_url.len()) // image_url length + image_url
+        + 32 // owner 
+        + 1 // group_type
+        + 1 // state
+        + 4 + ($group_descriptor.members.len()) * (32 + 1) // members length + members
+        + 4 // messages full length 
+        + (4 + 0) // messages length + messages
+    }
 }
