@@ -15,6 +15,8 @@ pub enum ErrorCode {
     NotInChat,
     #[msg("Invalid hash")]
     InvalidHash,
+    #[msg("Already in group")]
+    AlreadyInGroup,
 }
 
 fn get_hash(a: Pubkey, b: Pubkey) -> [u8; 32] {
@@ -157,10 +159,34 @@ pub mod cherry_chat {
     }
 
     pub fn create_group(ctx: Context<CreateGroup>, title: Vec<u8>, description: Vec<u8>, image_url: Vec<u8>) -> Result<()> {
+        let payer = &mut ctx.accounts.payer;
+        let payer_descriptor = &mut ctx.accounts.payer_descriptor;
+        let group_descriptor = &mut ctx.accounts.group_descriptor;
+
+        require!(payer_descriptor.groups.iter().all(|g| g.account != payer.key()), ErrorCode::AlreadyInGroup);
+
+        group_descriptor.title = title;
+        group_descriptor.description = description;
+        group_descriptor.image_url = image_url;
+        group_descriptor.owner = payer.key();
+        group_descriptor.group_type = GroupType::Private;
+        group_descriptor.state = GroupState::Active;
+        group_descriptor.members.push(Group {
+            account: payer.key(),
+            state: GroupPeerState::Joined,
+        });
+
+        payer_descriptor.groups.push(Group {
+            account: group_descriptor.key(),
+            state: GroupPeerState::Joined,
+        });
+
+        msg!("Create group: {:?}", group_descriptor.key());
+
         Ok(())
     }
 
-    pub fn invite_to_group(ctx: Context<InviteToGroup>) -> Result<()> {
+    pub fn invite_to_group(ctx: Context<InviteToGroup>, ) -> Result<()> {
         Ok(())
     }
 
