@@ -230,8 +230,8 @@ pub mod cherry_chat {
         let payer_descriptor = &mut ctx.accounts.payer_descriptor;
 
         require!(group_descriptor.state == GroupState::Active, ErrorCode::GroupIsNotActive);
-        require!(payer_descriptor.groups.iter().find(|g| g.account == payer.key() && g.state == GroupPeerState::Invited).is_some(), ErrorCode::NotInvited);
-        require!(group_descriptor.members.iter().find(|m| m.account == group_descriptor.key() && m.state == GroupPeerState::Invited).is_some(), ErrorCode::NotInvited);
+        require!(payer_descriptor.groups.iter().find(|g| g.account == group_descriptor.key() && g.state == GroupPeerState::Invited).is_some(), ErrorCode::NotInvited);
+        require!(group_descriptor.members.iter().find(|m| m.account == payer.key() && m.state == GroupPeerState::Invited).is_some(), ErrorCode::NotInvited);
 
         for g in payer_descriptor.groups.iter_mut() {
             if g.account == group_descriptor.key() {
