@@ -392,8 +392,8 @@ pub mod cherry_chat {
         require!(group_descriptor.state == GroupState::Active, ErrorCode::GroupIsNotActive);
         require!(group_descriptor.group_type == GroupType::Public, ErrorCode::GroupIsNotPublic);
 
-        require!(payer_descriptor.groups.iter().find(|g| g.account == group_descriptor.key()).is_some(), ErrorCode::NotInvited);
-        require!(group_descriptor.members.iter().find(|m| m.account == payer.key()).is_some(), ErrorCode::AlreadyInGroup);
+        require!(payer_descriptor.groups.iter().all(|g| g.account != group_descriptor.key()), ErrorCode::AlreadyInGroup);
+        require!(group_descriptor.members.iter().all(|m| m.account != payer.key()), ErrorCode::AlreadyInGroup);
 
         group_descriptor.members.push(Group {
             account: payer.key(),
@@ -584,9 +584,12 @@ pub struct CloseGroup<'info> {
 pub struct JoinGroup<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
-    #[account(mut, seeds = [b"wallet_descriptor", payer.key().as_ref()], bump)]
+    #[account(mut, seeds = [b"wallet_descriptor", payer.key().as_ref()], bump, realloc = 8 // discriminator
+        + 4 + (payer_descriptor.peers.len())*(32 + 1 ) 
+        + 4 + (payer_descriptor.groups.len() + 1) * ( 32 + 1 )
+    , realloc::payer = payer, realloc::zero = true)]
     pub payer_descriptor: Account<'info, WalletDescriptor>,
-    #[account(mut)]
+    #[account(mut,  realloc = group_invite_gd_realloc!(group_descriptor), realloc::payer = payer, realloc::zero = true)]
     pub group_descriptor: Account<'info, GroupDescriptor>,
     pub system_program: Program<'info, System>,
 }

@@ -790,7 +790,7 @@ export class Stem {
           isWritable: true,
         },
         {
-          pubkey: await helpers.getNewGroupPda(this._publicKey, 0),
+          pubkey: await helpers.getNewGroupPda(this._publicKey, this._groupsAccounts.size),
           isSigner: false,
           isWritable: true,
         },
@@ -912,6 +912,39 @@ export class Stem {
             disc: {array: {type: "u8", len: 8}}
           }}, {
             disc: await helpers.getdisc("accept_invite_to_group"),
+          }))
+        })
+    );
+  }
+  async createJoinGroupTx(group: PublicKey) {
+    return this._createTxWrapper(async () => 
+      new TransactionInstruction({
+        programId: PROGRAM_ID,
+        keys: [
+          {
+            pubkey: this._publicKey,
+            isSigner: true,
+            isWritable: false,
+          },
+          {
+            pubkey: await helpers.getDescriptorPda(this._publicKey),
+            isSigner: false,
+            isWritable: true,
+          },
+          {
+            pubkey: group,
+            isSigner: false,
+            isWritable: true,
+          },
+          {
+            pubkey: SystemProgram.programId,
+            isSigner: false,
+            isWritable: false,
+          }],
+          data: Buffer.from(borsh.serialize({struct: {
+            disc: {array: {type: "u8", len: 8}}
+          }}, {
+            disc: await helpers.getdisc("join_group"),
           }))
         })
     );
