@@ -13,11 +13,11 @@ import { Buffer } from 'buffer';
 import { EventEmitter } from "./events";
 
 import { Account, Connection } from "./solana";
-import { ChatSchema, DescriptorSchema } from "./schemas";
-import type { DescriptorBorsh, ChatBorsh } from "./types";
-import { PeerStatus } from "./types";
+import { ChatSchema, DescriptorSchema, GroupDescriptorSchema, GroupSchema } from "./schemas";
+import type { DescriptorBorsh, ChatBorsh, GroupBorsh, GroupDescriptorBorsh } from "./types";
+import { GroupPeerStatus, PeerStatus } from "./types";
 
-import { PROGRAM_ID, SEED_DESCRIPTOR, SEED_PRIVATE_CHAT } from "./const";
+import { PROGRAM_ID, SEED_DESCRIPTOR, SEED_PRIVATE_CHAT, SEED_GROUP_DESCRIPTOR } from "./const";
 
 const getHash = async (data: Buffer | string) => {
   if (typeof data === 'string') {
@@ -29,6 +29,21 @@ const getHash = async (data: Buffer | string) => {
   return  Buffer.from(hash.toString(CryptoJS.enc.Hex), 'hex');
 };
 
+const numToBuffer_64 = (num: number) => {
+  const buf = Buffer.alloc(8);
+  buf.writeUIntLE(num, 0, 8);
+  return buf;
+}
+const numToBuffer_32 = (num: number) => {
+  const buf = Buffer.alloc(4);
+  buf.writeUInt32LE(num, 0);
+  return buf;
+}
+const numToBuffer_8 = (num: number) => {
+  const buf = Buffer.alloc(1);
+  buf.writeUInt8(num, 0);
+  return buf;
+}
 
 export const helpers = {
   getdisc: async (name: string) => (await getHash(Buffer.from(`global:${name}`))).subarray(0, 8),
@@ -65,11 +80,22 @@ export const helpers = {
     );
     return chatPda;
   },
+  getNewGroupPda: async (publicKey: PublicKey, groups_count: number) => {
+    const [newGroupPda] = PublicKey.findProgramAddressSync(
+      [SEED_GROUP_DESCRIPTOR, publicKey.toBuffer(), numToBuffer_64(groups_count)],
+      PROGRAM_ID
+    );
+    return newGroupPda;
+  },
 };
 
 type PeerAccount = {
   account: Account | null;
   status: PeerStatus;
+};
+type GroupAccount = {
+  account: Account | null;
+  state: GroupPeerStatus;
 };
 
 type ChatMetadata = Record<string, {
@@ -83,6 +109,7 @@ export class Stem {
   private _connection: Connection;
   private _descriptorAccount: Account;
   private _chatsAccounts: Map<string, PeerAccount>;
+  private _groupsAccounts: Map<string, GroupAccount>;
   private _isRegistered: boolean;
   private _isLoaded: boolean;
   private _subscribe: boolean;
@@ -104,6 +131,7 @@ export class Stem {
       this._subscribe
     );
     this._chatsAccounts = new Map();
+    this._groupsAccounts = new Map();
     this._isRegistered = false;
     this._isLoaded = false;
 
@@ -128,12 +156,16 @@ export class Stem {
   get publicKey() {
     return this._publicKey;
   }
+  get account() {
+    return this._descriptorAccount;
+  }
 
   async _parseAndUpdatePeers() {
     // console.log("Stem._parseAndUpdatePeers()");
 
     let statusUpdated = false;
     let chatListUpdated = false;
+    let groupListUpdated = false;
 
     if (!this._descriptorAccount || !this._descriptorAccount.isInitialized) {
       if (this._isRegistered) {
@@ -202,6 +234,40 @@ export class Stem {
           }
         }
       }
+
+      for (const group of chats.groups) {
+        const groupPubKey = new PublicKey(group.account);
+        const groupPubKeyString = groupPubKey.toBase58();
+        const obj = this._groupsAccounts.get(groupPubKeyString);
+        if (!obj) {
+          this._groupsAccounts.set(groupPubKeyString, {
+            account: null,
+            state: group.state,
+          });
+          groupListUpdated = true;
+        }
+        if (group.state === GroupPeerStatus.Joined && !obj?.account) {
+         const account = new Account(
+            groupPubKey,
+            this._connection.connection,
+            this._subscribe
+          );
+          if (this._subscribe) {
+            account.onUpdate(() => {
+              console.log("STEM: Group updated", this._parseGroup(account));
+              this._emitter.emit("onGroupUpdated", {
+                pubkey: groupPubKey,
+                group: this._parseGroup(account),
+              });
+            });
+          }
+          account.fetch();
+          this._groupsAccounts.set(groupPubKeyString, {
+            account,
+            state: group.state,
+          });
+        }
+      }
     }
 
     if (chatListUpdated) {
@@ -260,6 +326,20 @@ export class Stem {
     });
   }
 
+  get groups() {
+    if (!this._isLoaded) {
+      return [];
+    }
+
+    return Array.from(this._groupsAccounts.keys()).map((pubKeyString) => {
+      const pubKey = new PublicKey(pubKeyString);
+      return {
+        account: pubKey,
+        state: this._groupsAccounts.get(pubKeyString)?.state,
+      };
+    });
+  }
+
   _parseChat(account: Account) {
     const chat = borsh.deserialize(
       ChatSchema,
@@ -271,7 +351,31 @@ export class Stem {
       length: chat.length,
       messages: chat.messages.map((message) => ({
         sender: new PublicKey(message.sender),
-        content: message.content,
+        content: Buffer.from(message.content).toString(),
+        timestamp: new Date(
+          Buffer.from(message.timestamp.slice(0, 4)).readUint32LE() * 1000
+        ),
+      })),
+    };
+  }
+
+  _parseGroup(account: Account) {
+    const group = borsh.deserialize(
+      GroupDescriptorSchema,
+      account.data.subarray(8)
+    ) as GroupDescriptorBorsh;
+    return {
+      title: Buffer.from(group.title).toString(),
+      description: Buffer.from(group.description).toString(),
+      image_url: Buffer.from(group.image_url).toString(),
+      owner: new PublicKey(group.owner),
+      group_type: group.group_type,
+      state: group.state,
+      members: group.members.map((member) => ({account: new PublicKey(member.account), state: member.state})),
+      length: group.length,
+      messages: group.messages.map((message) => ({
+        sender: new PublicKey(message.sender),
+        content: Buffer.from(message.content).toString(),
         timestamp: new Date(
           Buffer.from(message.timestamp.slice(0, 4)).readUint32LE() * 1000
         ),
@@ -294,6 +398,24 @@ export class Stem {
     }
 
     return peerAccount?.account ? this._parseChat(peerAccount.account) : null;
+  }
+
+  getGroup(pubkey: PublicKey) {
+    if (!this._isLoaded) {
+      throw Error("Account is not loaded");
+    }
+
+    if (!this._isRegistered) {
+      throw Error("Account not registred");
+    }
+
+    const groupAccount = this._groupsAccounts.get(pubkey.toBase58());
+
+    if (!groupAccount) {
+      return null;
+    }
+
+    return groupAccount?.account ? this._parseGroup(groupAccount.account) : null;
   }
 
   on(event: string, callback: (...args: any[]) => void) {
@@ -629,4 +751,176 @@ export class Stem {
     return tx;
   }
 
+  async _createTxWrapper(createIx: () => Promise<TransactionInstruction>) {
+    if (!this._isLoaded) {
+      throw Error("Account is not loaded");
+    }
+
+    if (!this._isRegistered) {
+      throw Error("Stem Account not registred");
+    }
+
+    const ix = await createIx();
+
+    const blockhash = await this._connection.getLatestBlockhash();
+    const txMessage  = new TransactionMessage({
+      payerKey: this._publicKey,
+      recentBlockhash: blockhash.blockhash,
+      instructions: [ix],
+    }).compileToV0Message();
+
+    const tx = new VersionedTransaction(txMessage);
+
+    return tx;
+  }
+
+  async createCreateGroupTx(type: number, title: string, description: string, image_url: string) {
+    return this._createTxWrapper(async () => 
+       new TransactionInstruction({
+      programId: PROGRAM_ID,
+      keys: [
+        {
+          pubkey: this._publicKey,
+          isSigner: true,
+          isWritable: false,
+        },
+        {
+          pubkey: await helpers.getDescriptorPda(this._publicKey),
+          isSigner: false,
+          isWritable: true,
+        },
+        {
+          pubkey: await helpers.getNewGroupPda(this._publicKey, 0),
+          isSigner: false,
+          isWritable: true,
+        },
+        {
+          pubkey: SystemProgram.programId,
+          isSigner: false,
+          isWritable: false,
+        },
+      ],
+      data:
+        Buffer.from(borsh.serialize({struct: {
+          disc: {array: {type: "u8", len: 8}},
+          group_type: 'u8',
+          title: {array: {type: "u8"}},
+          description: {array: {type: "u8"}},
+          image_url: {array: {type: "u8"}},
+        }}, {
+          disc: await helpers.getdisc("create_group"), 
+          group_type: type,
+          title: Buffer.from(title),
+          description: Buffer.from(description),
+          image_url: Buffer.from(image_url),
+        }))
+      })
+    );
+  }
+
+  async createSendMessageToGroupTx(group: PublicKey, content: string) {
+    return this._createTxWrapper(async () => 
+      new TransactionInstruction({
+        programId: PROGRAM_ID,
+        keys: [
+          {
+            pubkey: this._publicKey,
+            isSigner: true,
+            isWritable: false,
+          },
+          {
+            pubkey: group,
+            isSigner: false,
+            isWritable: true,
+          },
+          {
+            pubkey: SystemProgram.programId,
+            isSigner: false,
+            isWritable: false,
+          }],
+          data: Buffer.from(borsh.serialize({struct: {
+            disc: {array: {type: "u8", len: 8}},
+            content: {array: {type: "u8"}},
+          }}, {
+            disc: await helpers.getdisc("send_message_to_group"),
+            content: Buffer.from(content),
+          }))
+        })
+    );
+  }
+  async createInviteToGroupTx(group: PublicKey, invitee: PublicKey) {
+    return this._createTxWrapper(async () => 
+      new TransactionInstruction({
+        programId: PROGRAM_ID,
+        keys: [
+          {
+            pubkey: this._publicKey,
+            isSigner: true,
+            isWritable: false,
+          },
+          {
+            pubkey: group,
+            isSigner: false,
+            isWritable: true,
+          },
+          {
+            pubkey: await helpers.getDescriptorPda(invitee),
+            isSigner: false,
+            isWritable: true,
+          },
+          {
+            pubkey: SystemProgram.programId,
+            isSigner: false,
+            isWritable: false,
+          }],
+          data: Buffer.from(borsh.serialize({struct: {
+            disc: {array: {type: "u8", len: 8}},
+            invitee: {array: {type: "u8", len: 32}},
+          }}, {
+            disc: await helpers.getdisc("invite_to_group"),
+            invitee: invitee.toBuffer(),
+          }))
+        })
+    );
+  }
+  async createAcceptInviteToGroupTx(group: PublicKey) {
+    return this._createTxWrapper(async () => 
+      new TransactionInstruction({
+        programId: PROGRAM_ID,
+        keys: [
+          {
+            pubkey: this._publicKey,
+            isSigner: true,
+            isWritable: false,
+          },
+          {
+            pubkey: group,
+            isSigner: false,
+            isWritable: true,
+          },
+          {
+            pubkey: await helpers.getDescriptorPda(this._publicKey),
+            isSigner: false,
+            isWritable: true,
+          },
+          {
+            pubkey: SystemProgram.programId,
+            isSigner: false,
+            isWritable: false,
+          }],
+          data: Buffer.from(borsh.serialize({struct: {
+            disc: {array: {type: "u8", len: 8}}
+          }}, {
+            disc: await helpers.getdisc("accept_invite_to_group"),
+          }))
+        })
+    );
+  }
+
 }
+
+
+
+
+
+

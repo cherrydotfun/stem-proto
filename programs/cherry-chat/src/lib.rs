@@ -471,7 +471,7 @@ pub struct SendMessage<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(title: Vec<u8>, description: Vec<u8>, image_url: Vec<u8>)]
+#[instruction(group_type: GroupType, title: Vec<u8>, description: Vec<u8>, image_url: Vec<u8>)]
 pub struct CreateGroup<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
@@ -498,7 +498,7 @@ pub struct InviteToGroup<'info> {
 
     #[account(mut, seeds = [b"wallet_descriptor", invitee.as_ref()], bump, 
         realloc = 8 // discriminator
-        + 4 + (invitee_descriptor.peers.len())*(32) 
+        + 4 + (invitee_descriptor.peers.len())*(32 + 1) 
         + 4 + (invitee_descriptor.groups.len() + 1) * ( 32 + 1 )
     , realloc::payer = payer, realloc::zero = true)]
     pub invitee_descriptor: Account<'info, WalletDescriptor>,
@@ -528,10 +528,11 @@ pub struct RejectInviteToGroup<'info> {
 }
 
 #[derive(Accounts)]
+#[instruction(content: Vec<u8>)]
 pub struct SendMessageToGroup<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
-    #[account(mut)]
+    #[account(mut, realloc = group_send_message_gd_realloc!(group_descriptor, content), realloc::payer = payer, realloc::zero = true)]
     pub group_descriptor: Account<'info, GroupDescriptor>,
     pub system_program: Program<'info, System>,
 }
@@ -648,6 +649,7 @@ pub struct PrivateChat {
 pub enum GroupType{
     Private = 0,
     Public = 1,
+    Dummy = 2
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq, Eq)]
@@ -697,7 +699,7 @@ macro_rules! group_invite_gd_realloc {
         + 1 // state
         + 4 + ($group_descriptor.members.len() + 1) * (32 + 1) // one initial member (owner)
         + 4 // messages full length 
-        + (4 + 0) // messages length + messages
+        + (4 + $group_descriptor.length as usize) // messages length + messages
     }
 }
 
@@ -713,6 +715,22 @@ macro_rules! group_rename_gd_realloc {
         + 1 // state
         + 4 + ($group_descriptor.members.len()) * (32 + 1) // members length + members
         + 4 // messages full length 
-        + (4 + 0) // messages length + messages
+        + (4 + $group_descriptor.length as usize) // messages length + messages
+    }
+}
+
+#[macro_export]
+macro_rules! group_send_message_gd_realloc {
+    ($group_descriptor:expr, $content:expr) => {
+        8 // discriminator
+        + (4 + $group_descriptor.title.len()) // title length + title
+        + (4 + $group_descriptor.description.len()) // description length + description
+        + (4 + $group_descriptor.image_url.len()) // image_url length + image_url
+        + 32 // owner 
+        + 1 // group_type
+        + 1 // state
+        + 4 + $group_descriptor.members.len() * (32 + 1) // one initial member (owner)
+        + 4 // messages full length 
+        + (4 + $group_descriptor.length as usize + 32 + 4 + $content.len() + 8) // messages length + messages
     }
 }
