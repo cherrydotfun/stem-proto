@@ -2,7 +2,7 @@ import { PublicKey } from "@solana/web3.js";
 import { Buffer } from 'buffer';
 
 export const PROGRAM_ID = new PublicKey(
-  "BjheWDpSQGu1VmY1MHQPzvyBZDWvAnfrnw55mHr33BRB"
+  "7NLjSsfL7Hd3zauabU9EQEpT48wHnkrkZ1LJmJKdbqf"
 );
 export const SEED_DESCRIPTOR = Buffer.from("wallet_descriptor");
 export const SEED_PRIVATE_CHAT = Buffer.from("privite_chat");

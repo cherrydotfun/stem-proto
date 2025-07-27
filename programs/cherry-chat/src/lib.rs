@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::hash::{hash};
 
-declare_id!("BjheWDpSQGu1VmY1MHQPzvyBZDWvAnfrnw55mHr33BRB");
+declare_id!("7NLjSsfL7Hd3zauabU9EQEpT48wHnkrkZ1LJmJKdbqf");
 
 #[error_code]
 pub enum ErrorCode {
@@ -57,7 +57,7 @@ pub mod cherry_chat {
         Ok(())
     }
 
-    pub fn invite(ctx: Context<Invite>) -> Result<()> {
+    pub fn invite(ctx: Context<Invite>, _hash: [u8; 32], content: Vec<u8>) -> Result<()> {
         let inviter = &mut ctx.accounts.payer;
         let invitee = &mut ctx.accounts.invitee;
         let inviter_descriptor = &mut ctx.accounts.payer_descriptor;
@@ -65,6 +65,12 @@ pub mod cherry_chat {
 
         require!(inviter_descriptor.peers.iter().all(|p| p.wallet != invitee.key()), ErrorCode::AlreadyInvited);
         require!(invitee_descriptor.peers.iter().all(|p| p.wallet != inviter.key()), ErrorCode::AlreadyInvited);
+
+        let hash = get_hash(inviter.key(), invitee.key());
+        msg!("Hash: {:?}", hash);
+        msg!("Hash_: {:?}", _hash);
+        require!(hash == _hash, ErrorCode::InvalidHash);
+
 
         inviter_descriptor.peers.push(Peer {
             wallet: invitee.key(),
@@ -75,26 +81,33 @@ pub mod cherry_chat {
             state: PeerState::Requested,
         });
 
+        let private_chat = &mut ctx.accounts.private_chat;
+        private_chat.wallets = [inviter.key(), invitee.key()];
+        if content.len() > 0 {
+            private_chat.messages.push(Message {
+                sender: inviter.key(),
+                content: content.clone(),
+                timestamp: Clock::get().unwrap().unix_timestamp,
+            });
+
+            let message_length = 32 + 4 + private_chat.messages.last().unwrap().content.len() as u32 + 8;
+            private_chat.length += message_length;
+        }
+
         msg!("Invite: {:?} to {:?}", invitee.key(), inviter.key());
 
         Ok(())
     }
-
-    pub fn accept(ctx: Context<Accept>, _hash: [u8; 32]) -> Result<()> {
+    
+    pub fn accept(ctx: Context<Accept>) -> Result<()> {
         let me = &mut ctx.accounts.payer;
         let peer = &mut ctx.accounts.peer;
         let me_descriptor = &mut ctx.accounts.payer_descriptor;
         let peer_descriptor = &mut ctx.accounts.peer_descriptor;
-        let private_chat = &mut ctx.accounts.private_chat;
 
         require!(me_descriptor.peers.iter().find(|p| p.wallet == peer.key() && p.state == PeerState::Requested).is_some(), ErrorCode::NotRequested);
         require!(peer_descriptor.peers.iter().find(|p| p.wallet == me.key() && p.state == PeerState::Invited).is_some(), ErrorCode::NotInvited);
         
-        let hash = get_hash(me.key(), peer.key());
-        msg!("Hash: {:?}", hash);
-        msg!("Hash_: {:?}", _hash);
-        require!(hash == _hash, ErrorCode::InvalidHash);
-
         for p in me_descriptor.peers.iter_mut() {
             if p.wallet == peer.key() {
                 p.state = PeerState::Accepted;
@@ -108,7 +121,6 @@ pub mod cherry_chat {
             }
         }
 
-        private_chat.wallets = [me.key(), peer.key()];
         msg!("Accept: {:?} from {:?}", peer.key(), me.key());
 
         Ok(())
@@ -419,6 +431,7 @@ pub struct Register<'info> {
 }
 
 #[derive(Accounts)]
+#[instruction(_hash: [u8; 32], content: Vec<u8>)]
 pub struct Invite<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
@@ -428,6 +441,8 @@ pub struct Invite<'info> {
     pub payer_descriptor: Account<'info, WalletDescriptor>,
     #[account(mut, seeds = [b"wallet_descriptor", invitee.key().as_ref()], bump, realloc = 8 + 4 + (invitee_descriptor.peers.len() + 1)*(32 + 1) + 4 + (invitee_descriptor.groups.len()) * ( 32 +1 ), realloc::payer = payer, realloc::zero = true)]
     pub invitee_descriptor: Account<'info, WalletDescriptor>,
+    #[account(init, payer = payer, space = 8 + 32*2 + 4 + 4 + (32 + 4 + content.len() + 8) * (if content.len() > 0 { 1 } else { 0 }), seeds = [b"privite_chat", _hash.as_ref()], bump)]
+    pub private_chat: Account<'info, PrivateChat>,
     pub system_program: Program<'info, System>,
 }
 
@@ -444,7 +459,6 @@ pub struct Reject<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(_hash: [u8; 32])]
 pub struct Accept<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
@@ -453,10 +467,7 @@ pub struct Accept<'info> {
     #[account(mut, seeds = [b"wallet_descriptor", payer.key().as_ref()], bump)]
     pub payer_descriptor: Account<'info, WalletDescriptor>,
     #[account(mut, seeds = [b"wallet_descriptor", peer.key().as_ref()], bump)]
-    pub peer_descriptor: Account<'info, WalletDescriptor>,
-    #[account(init, payer = payer, space = 8 + 32*2 + 4 +4, seeds = [b"privite_chat", _hash.as_ref()], bump)]
-    pub private_chat: Account<'info, PrivateChat>,
-    pub system_program: Program<'info, System>,
+    pub peer_descriptor: Account<'info, WalletDescriptor>
 }
 
 #[derive(Accounts)]

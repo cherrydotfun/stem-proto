@@ -478,7 +478,7 @@ export class Stem {
 
     return tx;
   }
-  async createInviteTx(invitee: PublicKey) {
+  async createInviteTx(invitee: PublicKey, message: string = "") {
     if (!this._isLoaded) {
       throw Error("Account is not loaded");
     }
@@ -500,6 +500,8 @@ export class Stem {
     if (this._publicKey.toBase58() === invitee.toBase58()) {
       throw new Error("You can't invite yourself");
     }
+
+    const hash = await helpers.getChatHash(this._publicKey, invitee);
 
     const ix = new TransactionInstruction({
       programId: PROGRAM_ID,
@@ -525,12 +527,22 @@ export class Stem {
           isWritable: true,
         },
         {
+          pubkey: await helpers.getChatPda(this._publicKey, invitee),
+          isSigner: false,
+          isWritable: true,
+        },
+        {
           pubkey: SystemProgram.programId,
           isSigner: false,
           isWritable: false,
         },
       ],
-      data: await helpers.getdisc("invite"),
+      data: Buffer.concat([
+        await helpers.getdisc("invite"),
+        hash,
+        numToBuffer_32(Buffer.from(message).length),
+        Buffer.from(message),
+      ]),
     });
 
     const blockhash = await this._connection.getLatestBlockhash();
@@ -572,9 +584,6 @@ export class Stem {
       throw new Error("You can't invite yourself");
     }
 
-    console.log( await helpers.getdisc("accept"),);
-    console.log(await helpers.getChatHash(this._publicKey, invitee),);
-
     const ix = new TransactionInstruction({
       programId: PROGRAM_ID,
       keys: [
@@ -595,11 +604,6 @@ export class Stem {
         },
         {
           pubkey: inviteePda,
-          isSigner: false,
-          isWritable: true,
-        },
-        {
-          pubkey: await helpers.getChatPda(this._publicKey, invitee),
           isSigner: false,
           isWritable: true,
         },
