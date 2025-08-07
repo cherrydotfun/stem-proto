@@ -53,7 +53,16 @@ fn get_hash(a: Pubkey, b: Pubkey) -> [u8; 32] {
 #[program]
 pub mod cherry_chat {
     use super::*;
-    pub fn register(_ctx: Context<Register>) -> Result<()> {        
+    pub fn register(ctx: Context<Register>, public_key: [u8; 32]) -> Result<()> {   
+        let descriptor = &mut ctx.accounts.wallet_descriptor;
+        let payer = &mut ctx.accounts.payer;
+
+        descriptor.pubkey = public_key;
+        descriptor.peers = vec![];
+        descriptor.groups = vec![];
+
+        msg!("Register: {:?} with public key {:?}", payer.key(), public_key);
+
         Ok(())
     }
 
@@ -86,11 +95,12 @@ pub mod cherry_chat {
         if content.len() > 0 {
             private_chat.messages.push(Message {
                 sender: inviter.key(),
+                encoded: false,
                 content: content.clone(),
                 timestamp: Clock::get().unwrap().unix_timestamp,
             });
 
-            let message_length = 32 + 4 + private_chat.messages.last().unwrap().content.len() as u32 + 8;
+            let message_length = 32 + 4 + private_chat.messages.last().unwrap().content.len() as u32 + 8 + 1;
             private_chat.length += message_length;
         }
 
@@ -153,7 +163,7 @@ pub mod cherry_chat {
         Ok(())
     }
 
-    pub fn sendmessage(ctx: Context<SendMessage>, _hash: [u8; 32], content: Vec<u8>) -> Result<()> {
+    pub fn sendmessage(ctx: Context<SendMessage>, _hash: [u8; 32], content: Vec<u8>, encoded: bool) -> Result<()> {
         let payer = &mut ctx.accounts.payer;
         let private_chat = &mut ctx.accounts.private_chat;
 
@@ -163,11 +173,12 @@ pub mod cherry_chat {
 
         private_chat.messages.push(Message {
             sender: payer.key(),
+            encoded,
             content,
             timestamp: current_timestamp,
         });
 
-        let message_length = 32 + 4 + private_chat.messages.last().unwrap().content.len() as u32 + 8;
+        let message_length = 32 + 4 + private_chat.messages.last().unwrap().content.len() as u32 + 8 + 1;
         private_chat.length += message_length;
 
         // Find the receiver (the other wallet in the private chat)
@@ -302,6 +313,7 @@ pub mod cherry_chat {
 
         group_descriptor.messages.push(Message {
             sender: payer.key(),
+            encoded: false,
             content,
             timestamp: current_timestamp,
         });
