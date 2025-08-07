@@ -94,7 +94,8 @@ pub mod cherry_chat {
             private_chat.length += message_length;
         }
 
-        msg!("Invite: {:?} to {:?}", invitee.key(), inviter.key());
+        msg!("PrivateInvite: sender={:?}, target={:?}, chat={:?}", 
+             inviter.key(), invitee.key(), get_hash(inviter.key(), invitee.key()));
 
         Ok(())
     }
@@ -121,7 +122,8 @@ pub mod cherry_chat {
             }
         }
 
-        msg!("Accept: {:?} from {:?}", peer.key(), me.key());
+        msg!("PrivateAccept: accepter={:?}, inviter={:?}, chat={:?}", 
+             me.key(), peer.key(), get_hash(me.key(), peer.key()));
 
         Ok(())
     }
@@ -148,7 +150,8 @@ pub mod cherry_chat {
             }
         }
 
-        msg!("Reject: {:?} from {:?}", peer.key(), me.key());
+        msg!("PrivateReject: rejecter={:?}, inviter={:?}, chat={:?}", 
+             me.key(), peer.key(), get_hash(me.key(), peer.key()));
 
         Ok(())
     }
@@ -177,7 +180,8 @@ pub mod cherry_chat {
             private_chat.wallets[0]
         };
 
-        msg!("Msg: sender={:?}, receiver={:?}", payer.key(), receiver);
+        msg!("PrivateMessage: sender={:?}, receiver={:?}, chat={:?}", 
+             payer.key(), receiver, _hash);
 
         Ok(())
     }
@@ -309,7 +313,15 @@ pub mod cherry_chat {
         let message_length = 32 + 4 + group_descriptor.messages.last().unwrap().content.len() as u32 + 8;
         group_descriptor.length += message_length;
 
-        msg!("Send message to group: {:?}", group_descriptor.key());
+        // Get all active group members for notifications (exclude sender)
+        let active_members: Vec<String> = group_descriptor.members
+            .iter()
+            .filter(|m| m.state == GroupPeerState::Joined && m.account != payer.key())
+            .map(|m| m.account.to_string())
+            .collect();
+
+        msg!("GroupMessage: sender={:?}, group={:?}, recipients={}", 
+             payer.key(), group_descriptor.key(), active_members.join(","));
 
         Ok(())
     }
