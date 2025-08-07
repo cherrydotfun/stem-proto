@@ -423,7 +423,7 @@ pub mod cherry_chat {
 
 #[derive(Accounts)]
 pub struct Register<'info> {
-    #[account(init, payer = payer, space = 8 + 4 + (0) + 4 + (0), seeds = [b"wallet_descriptor", payer.key().as_ref()], bump)]
+    #[account(init, payer = payer, space = 8 + 4 + (0) + 4 + (0), seeds = [b"wallet_descriptor", payer.key().as_ref(), WALLET_DESCRIPTOR_VERSION.as_ref()], bump)]
     pub wallet_descriptor: Account<'info, WalletDescriptor>,
     #[account(mut)]
     pub payer: Signer<'info>,
@@ -437,11 +437,11 @@ pub struct Invite<'info> {
     pub payer: Signer<'info>,
     /// CHECK: invitee is a public key
     pub invitee: AccountInfo<'info>,
-    #[account(mut, seeds = [b"wallet_descriptor", payer.key().as_ref()], bump, realloc = 8 + 4 + (payer_descriptor.peers.len() + 1)*(32 + 1) + 4 + (payer_descriptor.groups.len()) * ( 32 +1 ), realloc::payer = payer, realloc::zero = true)]
+    #[account(mut, seeds = [b"wallet_descriptor", payer.key().as_ref(), WALLET_DESCRIPTOR_VERSION.as_ref()], bump, realloc = 8 + 4 + (payer_descriptor.peers.len() + 1)*(32 + 1) + 4 + (payer_descriptor.groups.len()) * ( 32 +1 ), realloc::payer = payer, realloc::zero = true)]
     pub payer_descriptor: Account<'info, WalletDescriptor>,
-    #[account(mut, seeds = [b"wallet_descriptor", invitee.key().as_ref()], bump, realloc = 8 + 4 + (invitee_descriptor.peers.len() + 1)*(32 + 1) + 4 + (invitee_descriptor.groups.len()) * ( 32 +1 ), realloc::payer = payer, realloc::zero = true)]
+    #[account(mut, seeds = [b"wallet_descriptor", invitee.key().as_ref(), WALLET_DESCRIPTOR_VERSION.as_ref()], bump, realloc = 8 + 4 + (invitee_descriptor.peers.len() + 1)*(32 + 1) + 4 + (invitee_descriptor.groups.len()) * ( 32 +1 ), realloc::payer = payer, realloc::zero = true)]
     pub invitee_descriptor: Account<'info, WalletDescriptor>,
-    #[account(init, payer = payer, space = 8 + 32*2 + 4 + 4 + (32 + 4 + content.len() + 8) * (if content.len() > 0 { 1 } else { 0 }), seeds = [b"privite_chat", _hash.as_ref()], bump)]
+    #[account(init, payer = payer, space = 8 + 32*2 + 4 + 4 + (32 + 4 + content.len() + 8) * (if content.len() > 0 { 1 } else { 0 }), seeds = [b"privite_chat", _hash.as_ref(), PRIVATE_CHAT_VERSION.as_ref()], bump)]
     pub private_chat: Account<'info, PrivateChat>,
     pub system_program: Program<'info, System>,
 }
@@ -452,9 +452,9 @@ pub struct Reject<'info> {
     pub payer: Signer<'info>,
     /// CHECK: invitee is a public key
     pub peer: AccountInfo<'info>,
-    #[account(mut, seeds = [b"wallet_descriptor", payer.key().as_ref()], bump)]
+    #[account(mut, seeds = [b"wallet_descriptor", payer.key().as_ref(), WALLET_DESCRIPTOR_VERSION.as_ref()], bump)]
     pub payer_descriptor: Account<'info, WalletDescriptor>,
-    #[account(mut, seeds = [b"wallet_descriptor", peer.key().as_ref()], bump)]
+    #[account(mut, seeds = [b"wallet_descriptor", peer.key().as_ref(), WALLET_DESCRIPTOR_VERSION.as_ref()], bump)]
     pub peer_descriptor: Account<'info, WalletDescriptor>,
 }
 
@@ -464,9 +464,9 @@ pub struct Accept<'info> {
     pub payer: Signer<'info>,
     /// CHECK: invitee is a public key
     pub peer: AccountInfo<'info>,
-    #[account(mut, seeds = [b"wallet_descriptor", payer.key().as_ref()], bump)]
+    #[account(mut, seeds = [b"wallet_descriptor", payer.key().as_ref(), WALLET_DESCRIPTOR_VERSION.as_ref()], bump)]
     pub payer_descriptor: Account<'info, WalletDescriptor>,
-    #[account(mut, seeds = [b"wallet_descriptor", peer.key().as_ref()], bump)]
+    #[account(mut, seeds = [b"wallet_descriptor", peer.key().as_ref(), WALLET_DESCRIPTOR_VERSION.as_ref()], bump)]
     pub peer_descriptor: Account<'info, WalletDescriptor>
 }
 
@@ -475,7 +475,7 @@ pub struct Accept<'info> {
 pub struct SendMessage<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
-    #[account(mut, seeds = [b"privite_chat", _hash.as_ref()], bump, 
+    #[account(mut, seeds = [b"privite_chat", _hash.as_ref(), PRIVATE_CHAT_VERSION.as_ref()], bump, 
         realloc = 8 + 32* 2 + 8 + (private_chat.length as usize) + 32 + 4 + content.len() + 8, realloc::payer = payer, realloc::zero = true)]
     pub private_chat: Account<'info, PrivateChat>,
     pub system_program: Program<'info, System>,
@@ -486,7 +486,7 @@ pub struct SendMessage<'info> {
 pub struct CreateGroup<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
-    #[account(mut, seeds = [b"wallet_descriptor", payer.key().as_ref()], bump, realloc = 8 + 4 + (payer_descriptor.peers.len())*(32 + 1) + 4 + (payer_descriptor.groups.len() + 1) * ( 32 +1 ), realloc::payer = payer, realloc::zero = true)]
+    #[account(mut, seeds = [b"wallet_descriptor", payer.key().as_ref(), WALLET_DESCRIPTOR_VERSION.as_ref()], bump, realloc = 8 + 4 + (payer_descriptor.peers.len())*(32 + 1) + 4 + (payer_descriptor.groups.len() + 1) * ( 32 +1 ), realloc::payer = payer, realloc::zero = true)]
     pub payer_descriptor: Account<'info, WalletDescriptor>,
     #[account(init, 
         payer = payer, 
@@ -507,7 +507,7 @@ pub struct InviteToGroup<'info> {
         realloc = group_invite_gd_realloc!(group_descriptor), realloc::payer = payer, realloc::zero = true)]
     pub group_descriptor: Account<'info, GroupDescriptor>,
 
-    #[account(mut, seeds = [b"wallet_descriptor", invitee.as_ref()], bump, 
+    #[account(mut, seeds = [b"wallet_descriptor", invitee.as_ref(), WALLET_DESCRIPTOR_VERSION.as_ref()], bump, 
         realloc = 8 // discriminator
         + 4 + (invitee_descriptor.peers.len())*(32 + 1) 
         + 4 + (invitee_descriptor.groups.len() + 1) * ( 32 + 1 )
@@ -522,7 +522,7 @@ pub struct AcceptInviteToGroup<'info> {
     pub payer: Signer<'info>,
     #[account(mut)]
     pub group_descriptor: Account<'info, GroupDescriptor>,
-    #[account(mut, seeds = [b"wallet_descriptor", payer.key().as_ref()], bump)]
+    #[account(mut, seeds = [b"wallet_descriptor", payer.key().as_ref(), WALLET_DESCRIPTOR_VERSION.as_ref()], bump)]
     pub payer_descriptor: Account<'info, WalletDescriptor>,
     pub system_program: Program<'info, System>,
 }
@@ -533,7 +533,7 @@ pub struct RejectInviteToGroup<'info> {
     pub payer: Signer<'info>,
     #[account(mut)]
     pub group_descriptor: Account<'info, GroupDescriptor>,
-    #[account(mut, seeds = [b"wallet_descriptor", payer.key().as_ref()], bump)]
+    #[account(mut, seeds = [b"wallet_descriptor", payer.key().as_ref(), WALLET_DESCRIPTOR_VERSION.as_ref()], bump)]
     pub payer_descriptor: Account<'info, WalletDescriptor>,
     pub system_program: Program<'info, System>,
 }
@@ -552,7 +552,7 @@ pub struct SendMessageToGroup<'info> {
 pub struct LeaveGroup<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
-    #[account(mut, seeds = [b"wallet_descriptor", payer.key().as_ref()], bump)]
+    #[account(mut, seeds = [b"wallet_descriptor", payer.key().as_ref(), WALLET_DESCRIPTOR_VERSION.as_ref()], bump)]
     pub payer_descriptor: Account<'info, WalletDescriptor>,
     #[account(mut)]
     pub group_descriptor: Account<'info, GroupDescriptor>,
@@ -564,7 +564,7 @@ pub struct LeaveGroup<'info> {
 pub struct KickFromGroup<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
-    #[account(mut, seeds = [b"wallet_descriptor", target.as_ref()], bump)]
+    #[account(mut, seeds = [b"wallet_descriptor", target.as_ref(), WALLET_DESCRIPTOR_VERSION.as_ref()], bump)]
     pub target_descriptor: Account<'info, WalletDescriptor>,
     #[account(mut)]
     pub group_descriptor: Account<'info, GroupDescriptor>,
@@ -595,7 +595,7 @@ pub struct CloseGroup<'info> {
 pub struct JoinGroup<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
-    #[account(mut, seeds = [b"wallet_descriptor", payer.key().as_ref()], bump, realloc = 8 // discriminator
+    #[account(mut, seeds = [b"wallet_descriptor", payer.key().as_ref(), WALLET_DESCRIPTOR_VERSION.as_ref()], bump, realloc = 8 // discriminator
         + 4 + (payer_descriptor.peers.len())*(32 + 1 ) 
         + 4 + (payer_descriptor.groups.len() + 1) * ( 32 + 1 )
     , realloc::payer = payer, realloc::zero = true)]
@@ -636,25 +636,31 @@ pub struct Group {
     pub state: GroupPeerState,
 }
 
+const WALLET_DESCRIPTOR_VERSION: [u8; 1] = [1];
 // WalletDescriptor is a descriptor for a wallet.
 #[account]
 pub struct WalletDescriptor {
+    pub pubkey: [u8; 32],
     pub peers: Vec<Peer>,
     pub groups: Vec<Group>,
 }
 
+const MESSAGE_VERSION: [u8; 1] = [1];
 // PrivateMessage is a message in a private chat.
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct Message{
     pub sender: Pubkey,
+    pub encoded: bool,
     pub content: Vec<u8>,
     pub timestamp: i64,
 }
 
+const PRIVATE_CHAT_VERSION: [u8; 1] = [1];
 // PrivateChat is a chat between two wallets.
 #[account]
 pub struct PrivateChat {
     pub wallets: [Pubkey; 2],
+    pub encrypted_keys: [[u8; 32]; 2],
     pub length: u32,
     pub messages: Vec<Message>,
 }

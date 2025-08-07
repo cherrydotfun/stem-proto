@@ -48,10 +48,10 @@ export const useAccount = (
     raw: null as Account | null,
   });
 
-  watchEffect(() => {
+  watchEffect(async () => {
     console.log("Composable Account watchEffect", publicKey.value);
     if (publicKey.value) {
-      account = connection.getAccount(publicKey.value, true);
+      account = await connection.getAccount(publicKey.value, true);
       retData.raw = account;
       account.onUpdate((account) => {
         console.log("Composable Account updated", account);

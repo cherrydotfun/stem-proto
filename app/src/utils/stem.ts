@@ -14,19 +14,22 @@ import { EventEmitter } from "./events";
 
 import { Account, Connection } from "./solana";
 import { ChatSchema, DescriptorSchema, GroupDescriptorSchema, GroupSchema } from "./schemas";
-import type { DescriptorBorsh, ChatBorsh, GroupBorsh, GroupDescriptorBorsh } from "./types";
-import { GroupPeerStatus, PeerStatus } from "./types";
+import type { DescriptorBorsh, ChatBorsh, GroupBorsh, GroupDescriptorBorsh, ChatListItem } from "./types";
+import { GroupPeerStatus, PeerStatus, PeerAccount, GroupAccount, ChatMetadata, ChatMap, GroupMap } from "./types";
 
 import { PROGRAM_ID, SEED_DESCRIPTOR, SEED_PRIVATE_CHAT, SEED_GROUP_DESCRIPTOR } from "./const";
 
-const getHash = async (data: Buffer | string) => {
+const _getHash = (data: Buffer | string) => {
   if (typeof data === 'string') {
     const hash = CryptoJS.SHA256(data);
-    return  Buffer.from(hash.toString(CryptoJS.enc.Hex), 'hex');
+    return hash.toString(CryptoJS.enc.Hex);
   }
   const wordArray = CryptoJS.lib.WordArray.create(data);
   const hash = CryptoJS.SHA256(wordArray);
-  return  Buffer.from(hash.toString(CryptoJS.enc.Hex), 'hex');
+  return  hash.toString(CryptoJS.enc.Hex);
+};
+const getHash = (data: Buffer | string) => {
+  return Buffer.from(_getHash(data), 'hex');
 };
 
 const numToBuffer_64 = (num: number) => {
@@ -73,14 +76,14 @@ export const helpers = {
 
     return getHash(raw);
   },
-  getChatPda: async (publicKey: PublicKey, peer: PublicKey) => {
+  getChatPda: (publicKey: PublicKey, peer: PublicKey) => {
     const [chatPda] = PublicKey.findProgramAddressSync(
-      [SEED_PRIVATE_CHAT, await helpers.getChatHash(publicKey, peer)],
+      [SEED_PRIVATE_CHAT, helpers.getChatHash(publicKey, peer)],
       PROGRAM_ID
     );
     return chatPda;
   },
-  getNewGroupPda: async (publicKey: PublicKey, groups_count: number) => {
+  getNewGroupPda: (publicKey: PublicKey, groups_count: number) => {
     const [newGroupPda] = PublicKey.findProgramAddressSync(
       [SEED_GROUP_DESCRIPTOR, publicKey.toBuffer(), numToBuffer_64(groups_count)],
       PROGRAM_ID
@@ -89,27 +92,12 @@ export const helpers = {
   },
 };
 
-type PeerAccount = {
-  account: Account | null;
-  status: PeerStatus;
-};
-type GroupAccount = {
-  account: Account | null;
-  state: GroupPeerStatus;
-};
-
-type ChatMetadata = Record<string, {
-  lastMessage: string;
-  timestamp: string;
-  lastMessageSender: string;
-}>;
-
 export class Stem {
   private _publicKey: PublicKey;
   private _connection: Connection;
   private _descriptorAccount: Account;
-  private _chatsAccounts: Map<string, PeerAccount>;
-  private _groupsAccounts: Map<string, GroupAccount>;
+  private _chatsAccounts: ChatMap;
+  private _groupsAccounts: GroupMap;
   private _isRegistered: boolean;
   private _isLoaded: boolean;
   private _subscribe: boolean;
@@ -161,7 +149,7 @@ export class Stem {
   }
 
   async _parseAndUpdatePeers() {
-    // console.log("Stem._parseAndUpdatePeers()");
+    console.log("Stem._parseAndUpdatePeers()");
 
     let statusUpdated = false;
     let chatListUpdated = false;
@@ -179,7 +167,10 @@ export class Stem {
       this._isRegistered = true;
     }
 
+    console.log('Stem._parseAndUpdatePeers try parse if initialized', this._descriptorAccount.isInitialized);
+
     if (this._descriptorAccount.isInitialized) {
+      console.log('Stem._parseAndUpdatePeers descriptorAccount isInitialized');
       const chats = borsh.deserialize(
         DescriptorSchema,
         this._descriptorAccount.data.subarray(8)
@@ -191,15 +182,6 @@ export class Stem {
         const obj = this._chatsAccounts.get(peerPubKeyString);
         // ??
         if (!obj) {
-          this._chatsAccounts.set(peerPubKeyString, {
-            account: null,
-            status: peer.status,
-          });
-          chatListUpdated = true;
-        }
-
-        // only accepted peer has chat account
-        if (peer.status === PeerStatus.Accepted && !obj?.account) {
           const chatPda = await helpers.getChatPda(this._publicKey, peerPubKey);
           const account = new Account(
             chatPda,
@@ -208,7 +190,7 @@ export class Stem {
           );
           if (this._subscribe) {
             account.onUpdate(() => {
-              console.log("STEM: Chat updated", this._parseChat(account));
+              console.log("STEM: Chat updated", account.publicKey.toBase58());
               this._emitter.emit("onChatUpdated", {
                 pubkey: peerPubKey,
                 chat: this._parseChat(account),
@@ -223,15 +205,12 @@ export class Stem {
           });
 
           chatListUpdated = true;
-        } else {
-          const peerAccount = this._chatsAccounts.get(peerPubKeyString);
-          if (!peerAccount || peerAccount.status !== peer.status) {
-            this._chatsAccounts.set(peerPubKeyString, {
-              account: null,
-              status: peer.status,
-            });
-            chatListUpdated = true;
-          }
+        } else if (peer.status !== obj?.status) {
+          this._chatsAccounts.set(peerPubKeyString, {
+            account: obj?.account!,
+            status: peer.status,
+          });
+          chatListUpdated = true;
         }
       }
 
@@ -247,14 +226,14 @@ export class Stem {
           groupListUpdated = true;
         }
         if (group.state === GroupPeerStatus.Joined && !obj?.account) {
-         const account = new Account(
+        const account = new Account(
             groupPubKey,
             this._connection.connection,
             this._subscribe
           );
           if (this._subscribe) {
             account.onUpdate(() => {
-              console.log("STEM: Group updated", this._parseGroup(account));
+              // console.log("STEM: Group updated", this._parseGroup(account));
               this._emitter.emit("onGroupUpdated", {
                 pubkey: groupPubKey,
                 group: this._parseGroup(account),
@@ -279,12 +258,18 @@ export class Stem {
       this._emitter.emit("onStatusUpdated", this._isRegistered);
     }
 
+    // console.log('Stem._parseAndUpdatePeers - chatsAccounts', this._chatsAccounts);
+
     return chatListUpdated;
   }
 
   async init() {
+    console.log('Stem init start');
+    console.log('Stem init descriptorAccount');
     await this._descriptorAccount.fetch();
+    console.log('Stem init descriptorAccount done');
     await this._parseAndUpdatePeers();
+    console.log('Stem init parseAndUpdatePeers done');
 
     if (this._subscribe) {
       this._descriptorAccount.onUpdate(this._parseAndUpdatePeers);
@@ -293,16 +278,17 @@ export class Stem {
     this._isLoaded = true;
     console.log('Stem is loaded');
 
-    this._emitter.emit("onChatsUpdated", this);
+    this._emitter.emit("onChatsUpdated", this._chatsAccounts);
 
-    this._emitter.on("onChatUpdated", (chat) => {
-      this._metadata[chat.pubkey.toString()] = {
-        lastMessage: chat.chat.messages[chat.chat.messages.length - 1]?.content,
-        timestamp: chat.chat.messages[chat.chat.messages.length - 1]?.timestamp,
-        lastMessageSender: chat.chat.messages[chat.chat.messages.length - 1]?.sender.toString(),
-      };
-      this._emitter.emit("onChatsUpdated", this);
-    });
+    // this._emitter.on("onChatUpdated", (chat) => {
+    //   // this._metadata[chat.pubkey.toString()] = {
+    //   //   lastMessage: chat.chat.messages[chat.chat.messages.length - 1]?.content,
+    //   //   timestamp: chat.chat.messages[chat.chat.messages.length - 1]?.timestamp,
+    //   //   lastMessageSender: chat.chat.messages[chat.chat.messages.length - 1]?.sender.toString(),
+    //   //   lastMessageId: chat.chat.messages[chat.chat.messages.length - 1]?.id,
+    //   // };
+    //   this._emitter.emit("onChatsUpdated", this._chatsAccounts);
+    // });
 
     return this;
   }
@@ -319,10 +305,11 @@ export class Stem {
       return {
         pubkey: pubKey,
         status: this._chatsAccounts.get(pubKeyString)?.status,
-        lastMessage: this._metadata[pubKeyString]?.lastMessage,
-        timestamp: this._metadata[pubKeyString]?.timestamp,
-        lastMessageSender: this._metadata[pubKeyString]?.lastMessageSender,
-      };
+        lastMessage: this._metadata[pubKeyString]?.lastMessage || undefined,
+        timestamp: this._metadata[pubKeyString]?.timestamp || undefined,
+        lastMessageSender: this._metadata[pubKeyString]?.lastMessageSender || undefined,
+        lastMessageId: this._metadata[pubKeyString]?.lastMessageId || '',
+      } as ChatListItem;
     });
   }
 
@@ -349,7 +336,9 @@ export class Stem {
     return {
       wallets: chat.wallets.map((wallet) => new PublicKey(wallet)),
       length: chat.length,
-      messages: chat.messages.map((message) => ({
+      messages: chat.messages.map((message, index) => ({
+        id:  _getHash(Buffer.concat([Buffer.from(message.sender), Buffer.from(message.content), Buffer.from(message.timestamp)])),
+        index,
         sender: new PublicKey(message.sender),
         content: Buffer.from(message.content).toString(),
         timestamp: new Date(
@@ -373,7 +362,9 @@ export class Stem {
       state: group.state,
       members: group.members.map((member) => ({account: new PublicKey(member.account), state: member.state})),
       length: group.length,
-      messages: group.messages.map((message) => ({
+      messages: group.messages.map((message, index) => ({
+        id: _getHash(Buffer.concat([Buffer.from(message.sender), Buffer.from(message.content), Buffer.from(message.timestamp)])),
+        index,
         sender: new PublicKey(message.sender),
         content: Buffer.from(message.content).toString(),
         timestamp: new Date(
@@ -392,6 +383,9 @@ export class Stem {
     }
 
     const peerAccount = this._chatsAccounts.get(pubkey.toBase58());
+
+    // console.log('getChat - peerAccount', pubkey.toString(), peerAccount);
+    // console.log('getChat - chatsAccounts', this._chatsAccounts);
 
     if (!peerAccount) {
       return null;
@@ -418,8 +412,61 @@ export class Stem {
     return groupAccount?.account ? this._parseGroup(groupAccount.account) : null;
   }
 
+  async fetchPublicGroup(pubkey: PublicKey, onUpdateCallback: ((group: any) => void)| undefined = undefined) {
+    const groupAccount = new Account(pubkey, this._connection.connection, !!onUpdateCallback);
+    if (!!onUpdateCallback) {
+      groupAccount.onUpdate(() => {
+        // console.log("STEM: Group updated", this._parseGroup(groupAccount));
+        onUpdateCallback({
+          pubkey: pubkey,
+          group: this._parseGroup(groupAccount),
+        });
+      });
+    }
+    await groupAccount.fetch();
+    return this._parseGroup(groupAccount);
+  }
+
+  async fetchUserAccount(publicKey: PublicKey) {
+    // debugger
+    const res = {
+      isActivated: false,
+      isRegistered: false,
+      chats: [] as PublicKey[],
+      groups: [] as PublicKey[]
+    };
+
+    const userAccount = await this._connection.getAccount(publicKey);
+    if (!userAccount.isInitialized) {
+      return res;
+    }
+    res.isActivated = true;
+
+    const descriptorAccount = await this._connection.getAccount(helpers.getDescriptorPda(publicKey))
+    if (!descriptorAccount.isInitialized) {
+      return res;
+    }
+    res.isRegistered = true;
+
+    const data = borsh.deserialize(
+      DescriptorSchema,
+      this._descriptorAccount.data.subarray(8)
+    ) as DescriptorBorsh;
+
+    res.chats = data.peers.map(i => new PublicKey(i.pubkey));
+    res.groups = data.groups.map(i => new PublicKey(i.account));
+
+    console.log('### fetchUserAccount', publicKey.toBase58(), res);
+
+    return res;
+  }
+
   on(event: string, callback: (...args: any[]) => void) {
     this._emitter.on(event, callback);
+  }
+
+  off(event: string, callback: (...args: any[]) => void) {
+    this._emitter.off(event, callback);
   }
 
   // Programm calls

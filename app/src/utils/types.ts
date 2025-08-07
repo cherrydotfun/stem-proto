@@ -1,5 +1,7 @@
 import { PublicKey } from "@solana/web3.js";
 
+import { Account } from "./solana";
+
 /**
  * for inviter:
  *            Accepted
@@ -36,6 +38,26 @@ export type Peer = {
   status: PeerStatus;
 };
 
+export type PeerAccount = {
+  account: Account | null;
+  status: PeerStatus;
+};
+export type GroupAccount = {
+  account: Account | null;
+  state: GroupPeerStatus;
+};
+
+export type ChatMap = Map<string, PeerAccount>;
+export type GroupMap = Map<string, GroupAccount>;
+
+export type ChatMetadata = Record<string, {
+  lastMessage: string;
+  timestamp: string;
+  lastMessageSender: string;
+  lastMessageId: string;
+}>;
+
+
 export type Descriptor = {
   peers: Peer[];
 };
@@ -56,6 +78,8 @@ export type DescriptorBorsh = {
 };
 
 export type Message = {
+  readonly id: string;
+  readonly index: number;
   readonly sender: PublicKey;
   readonly content: string;
   readonly timestamp: Date;
@@ -72,9 +96,10 @@ export type ChatListItem = {
   pubkey: PublicKey;
   status: PeerStatus | undefined;
   lastMessage: string | undefined;
-  timestamp: Date | undefined;
+  lastMessageId: string;
+  timestamp: string | undefined;
   lastMessageSender: string | undefined;
-}[]
+};
 
 export type ChatList =ChatListItem[];
 
