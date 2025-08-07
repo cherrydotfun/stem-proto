@@ -151,9 +151,19 @@
     // register
     const register = async () => {
     if (props.wallet.publicKey && props.stem.raw) {
+      console.log("Registering");
+      const seedMsg  = props.stem.raw.generateSeedMessage();
+      console.log("Seed", seedMsg);
+      const signature = await props.wallet.signMessage(seedMsg);
+      console.log("Signature", signature);
+      props.stem.raw.generateKeyPair(signature);
+      console.log("Key pair generated");
+
       registrationIsInProgress.value = true;
       const tx = await props.stem.raw.createRegisterTx();
-      const signatureObject = await props.wallet.signTransaction(tx);
+      const signedTx = await props.wallet.signTransaction(tx);
+
+      const signatureObject = await props.stem.raw.connection.sendTransaction(signedTx);
       await signatureObject.confirm("finalized");
       console.log("Register TX sent", signatureObject);
       registrationIsInProgress.value = false;

@@ -83,7 +83,9 @@
         placeholder="Enter public key"
         class="invite-input"
       />
-      <button @click="invite" class="invite-button">Invite</button>
+      <!-- <button @click="invite" class="invite-button">Invite</button>
+      <button @click="createGroup" class="invite-button">Create GROUP</button>
+      <button @click="printGroups" class="invite-button">Print Groups</button> -->
     </div>
   </div>
 </template>
@@ -120,6 +122,8 @@
     (e: "invite", invitee: string): void;
     (e: "acceptPeer", peer: PublicKey): void;
     (e: "rejectPeer", peer: PublicKey): void;
+    (e: "createGroup"): void;
+    (e: "printGroups"): void;
   }>();
 
   // const publicKey = computed(() => new PublicKey(props.userKey));
@@ -163,6 +167,14 @@
     emit("rejectPeer", peer);
     reacted[peer.toBase58()] = true;
   };
+
+  const createGroup = () => {
+    emit("createGroup");
+  }
+
+  const printGroups = () => {
+    emit("printGroups");
+  }
 </script>
 
 <style scoped>

@@ -47,5 +47,12 @@ export const usePhantomWallet = (rpcUrl: string = "http://localhost:8899") => {
     return new Signature(signature, connection);
   };
 
-  return { name, installed, publicKey, connect, connected, signTransaction };
+  const signMessage = async (message: string) => {
+    if (!publicKey.value) {
+      throw new Error("Keypair not found");
+    }
+    return await wallet.signMessage(new TextEncoder().encode(message));
+  };
+
+  return { name, installed, publicKey, connect, connected, signTransaction, signMessage };
 };

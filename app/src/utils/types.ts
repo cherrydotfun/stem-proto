@@ -73,6 +73,7 @@ export type GroupBorsh = {
 };
 
 export type DescriptorBorsh = {
+  pubkey: Uint8Array;
   peers: PeerBorsh[];
   groups: GroupBorsh[];
 };

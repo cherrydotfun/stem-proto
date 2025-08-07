@@ -9,15 +9,21 @@ import {
 import * as CryptoJS from 'crypto-js';
 import * as borsh from "borsh";
 import { Buffer } from 'buffer';
+import nacl from 'tweetnacl';
+
+import { hkdf } from '@noble/hashes/hkdf';
+import { sha256 } from '@noble/hashes/sha2';
+
+import * as ed2curve from 'ed2curve';
 
 import { EventEmitter } from "./events";
 
 import { Account, Connection } from "./solana";
-import { ChatSchema, DescriptorSchema, GroupDescriptorSchema, GroupSchema } from "./schemas";
-import type { DescriptorBorsh, ChatBorsh, GroupBorsh, GroupDescriptorBorsh, ChatListItem } from "./types";
-import { GroupPeerStatus, PeerStatus, PeerAccount, GroupAccount, ChatMetadata, ChatMap, GroupMap } from "./types";
+import { ChatSchema, DescriptorSchema, GroupDescriptorSchema } from "./schemas";
+import type { DescriptorBorsh, ChatBorsh, GroupDescriptorBorsh, ChatListItem, ChatMetadata, ChatMap, GroupMap } from "./types";
+import { GroupPeerStatus, PeerStatus } from "./types";
 
-import { PROGRAM_ID, SEED_DESCRIPTOR, SEED_PRIVATE_CHAT, SEED_GROUP_DESCRIPTOR } from "./const";
+import { PROGRAM_ID, SEED_DESCRIPTOR, SEED_PRIVATE_CHAT, SEED_GROUP_DESCRIPTOR, WALLET_DESCRIPTOR_VERSION, PRIVATE_CHAT_VERSION } from "./const";
 
 const _getHash = (data: Buffer | string) => {
   if (typeof data === 'string') {
@@ -53,7 +59,7 @@ export const helpers = {
 
   getDescriptorPda: (publicKey: PublicKey) => {
     const [descriptorPda] = PublicKey.findProgramAddressSync(
-      [SEED_DESCRIPTOR, publicKey.toBuffer()],
+      [SEED_DESCRIPTOR, publicKey.toBuffer(), WALLET_DESCRIPTOR_VERSION],
       PROGRAM_ID
     );
     return descriptorPda;
@@ -78,7 +84,7 @@ export const helpers = {
   },
   getChatPda: (publicKey: PublicKey, peer: PublicKey) => {
     const [chatPda] = PublicKey.findProgramAddressSync(
-      [SEED_PRIVATE_CHAT, helpers.getChatHash(publicKey, peer)],
+      [SEED_PRIVATE_CHAT, helpers.getChatHash(publicKey, peer), PRIVATE_CHAT_VERSION],
       PROGRAM_ID
     );
     return chatPda;
@@ -90,6 +96,14 @@ export const helpers = {
     );
     return newGroupPda;
   },
+  deriveSeedFromSignature(signature: Uint8Array): Uint8Array {
+    const salt = new TextEncoder().encode('Web3MessengerHKDFSalt');
+    const info = new TextEncoder().encode('KeyDerivation');
+  
+    const seed = hkdf(sha256, signature, salt, info, 32); // 32 bytes for X25519
+  
+    return seed;
+  }
 };
 
 export class Stem {
@@ -102,6 +116,9 @@ export class Stem {
   private _isLoaded: boolean;
   private _subscribe: boolean;
   private _metadata: ChatMetadata = {};
+
+  private _x25519Private: Uint8Array | null = null;
+  private _x25519Public: Uint8Array | null = null;
 
   private _emitter: EventEmitter = new EventEmitter();
 
@@ -122,6 +139,8 @@ export class Stem {
     this._groupsAccounts = new Map();
     this._isRegistered = false;
     this._isLoaded = false;
+    this._x25519Private = null;
+    this._x25519Public = null;
 
     this._parseAndUpdatePeers = this._parseAndUpdatePeers.bind(this);
   }
@@ -146,6 +165,40 @@ export class Stem {
   }
   get account() {
     return this._descriptorAccount;
+  }
+
+  generateSeedMessage() {
+    if (!this._isLoaded) {
+      throw Error("Stem is not loaded");
+    }
+
+    const sha512Hash = nacl.hash(this._publicKey.toBuffer());
+    const base64Hash = Buffer.from(sha512Hash).toString('base64');
+    return `CherryChat:v1:\n${this._publicKey.toBase58()}:\n${base64Hash}`;
+  }
+
+  generateKeyPair(seedMessageSignature: Uint8Array) {
+    const isValid = nacl.sign.detached.verify(
+      new TextEncoder().encode(this.generateSeedMessage()), // Uint8Array
+      seedMessageSignature, // Uint8Array
+      this._publicKey.toBytes() // Uint8Array (Ed25519 pubkey)
+    );
+    if (!isValid) {
+      throw Error("Invalid seed message signature");
+    }
+
+    const seed = helpers.deriveSeedFromSignature(seedMessageSignature);
+    const ed25519 = nacl.sign.keyPair.fromSeed(seed);
+
+    const x25519Private = ed2curve.convertSecretKey(ed25519.secretKey);
+    const x25519Public = ed2curve.convertPublicKey(ed25519.publicKey);
+
+    if (!x25519Private || !x25519Public) {
+      throw new Error('Error converting to X25519');
+    }
+
+    this._x25519Private = x25519Private;
+    this._x25519Public = x25519Public;
   }
 
   async _parseAndUpdatePeers() {
@@ -175,6 +228,8 @@ export class Stem {
         DescriptorSchema,
         this._descriptorAccount.data.subarray(8)
       ) as DescriptorBorsh;
+
+      console.log('Stem._parseAndUpdatePeers pubkey', chats.pubkey);
 
       for (const peer of chats.peers) {
         const peerPubKey = new PublicKey(peer.pubkey);
@@ -252,6 +307,10 @@ export class Stem {
     if (chatListUpdated) {
       console.log("STEM: Chat list updated");
       this._emitter.emit("onChatsUpdated", this._chatsAccounts);
+    }
+    if (groupListUpdated) {
+      console.log("STEM: Group list updated");
+      this._emitter.emit("onGroupsUpdated", this._groupsAccounts);
     }
     if (statusUpdated) {
       console.log("STEM: Status updated");
@@ -490,6 +549,10 @@ export class Stem {
     if (!descriptorPda) {
       throw new Error("Descriptor PDA not generated");
     }
+    
+    if (!this._x25519Private || !this._x25519Public) {
+      throw new Error("X25519 keys not generated");
+    }
 
     const ix = new TransactionInstruction({
       programId: PROGRAM_ID,
@@ -510,7 +573,10 @@ export class Stem {
           isWritable: false,
         },
       ],
-      data: await helpers.getdisc("register"),
+      data: Buffer.concat([
+        await helpers.getdisc("register"),
+        this._x25519Public,
+      ]),
     });
 
     const blockhash = await this._connection.getLatestBlockhash();
