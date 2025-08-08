@@ -159,6 +159,12 @@
       props.stem.raw.generateKeyPair(signature);
       console.log("Key pair generated");
 
+      const keys = {
+        x25519Private: Buffer.from(props.stem.raw.getX25519Private()).toString("base64"),
+        x25519Public: Buffer.from(props.stem.raw.getX25519Public()).toString("base64")
+      };
+      localStorage.setItem("x25519Keys", JSON.stringify(keys));
+
       registrationIsInProgress.value = true;
       const tx = await props.stem.raw.createRegisterTx();
       const signedTx = await props.wallet.signTransaction(tx);

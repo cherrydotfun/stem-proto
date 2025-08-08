@@ -66,7 +66,7 @@ pub mod cherry_chat {
         Ok(())
     }
 
-    pub fn invite(ctx: Context<Invite>, _hash: [u8; 32], keys: [[u8; 32];2], content: Vec<u8>, encoded: bool) -> Result<()> {
+    pub fn invite(ctx: Context<Invite>, _hash: [u8; 32], encrypted: bool, content: Vec<u8>) -> Result<()> {
         let inviter = &mut ctx.accounts.payer;
         let invitee = &mut ctx.accounts.invitee;
         let inviter_descriptor = &mut ctx.accounts.payer_descriptor;
@@ -76,8 +76,8 @@ pub mod cherry_chat {
         require!(invitee_descriptor.peers.iter().all(|p| p.wallet != inviter.key()), ErrorCode::AlreadyInvited);
 
         let hash = get_hash(inviter.key(), invitee.key());
-        msg!("Hash: {:?}", hash);
-        msg!("Hash_: {:?}", _hash);
+        // msg!("Hash: {:?}", hash);
+        // msg!("Hash_: {:?}", _hash);
         require!(hash == _hash, ErrorCode::InvalidHash);
 
 
@@ -92,14 +92,13 @@ pub mod cherry_chat {
         
         let private_chat = &mut ctx.accounts.private_chat;
         private_chat.wallets = [inviter.key(), invitee.key()];
-        private_chat.encrypted_keys = keys;
         private_chat.length = 0;
         private_chat.messages = vec![];
 
         if content.len() > 0 {
             private_chat.messages.push(Message {
                 sender: inviter.key(),
-                encoded: encoded,
+                encrypted: encrypted,
                 content: content.clone(),
                 timestamp: Clock::get().unwrap().unix_timestamp,
             });
@@ -167,7 +166,7 @@ pub mod cherry_chat {
         Ok(())
     }
 
-    pub fn sendmessage(ctx: Context<SendMessage>, _hash: [u8; 32], content: Vec<u8>, encoded: bool) -> Result<()> {
+    pub fn sendmessage(ctx: Context<SendMessage>, _hash: [u8; 32], encrypted: bool, content: Vec<u8>) -> Result<()> {
         let payer = &mut ctx.accounts.payer;
         let private_chat = &mut ctx.accounts.private_chat;
 
@@ -177,7 +176,7 @@ pub mod cherry_chat {
 
         private_chat.messages.push(Message {
             sender: payer.key(),
-            encoded,
+            encrypted,
             content,
             timestamp: current_timestamp,
         });
@@ -317,7 +316,7 @@ pub mod cherry_chat {
 
         group_descriptor.messages.push(Message {
             sender: payer.key(),
-            encoded: false,
+            encrypted: false,
             content,
             timestamp: current_timestamp,
         });
@@ -447,7 +446,7 @@ pub struct Register<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(_hash: [u8; 32], content: Vec<u8>)]
+#[instruction(_hash: [u8; 32], encrypted: bool, content: Vec<u8>)]
 pub struct Invite<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
@@ -460,7 +459,6 @@ pub struct Invite<'info> {
     #[account(init, payer = payer, 
         space = 8 
         + 32*2 // wallets
-        + 32*2 // encrypted_keys
         + 4 // messages full length
         + 4 // messages count
         + (32 + 4 + 1 + content.len() + 8) * (if content.len() > 0 { 1 } else { 0 }), 
@@ -501,7 +499,6 @@ pub struct SendMessage<'info> {
     #[account(mut, seeds = [b"privite_chat", _hash.as_ref(), PRIVATE_CHAT_VERSION.as_ref()], bump, 
         realloc = 8 
         + 32 * 2 // wallets 
-        + 32 * 2 // encrypted_keys
         + 4 // messages full length
         + 4 // messages count
         + (private_chat.length as usize) // messages length
@@ -680,7 +677,7 @@ const MESSAGE_VERSION: [u8; 1] = [1];
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct Message{
     pub sender: Pubkey,
-    pub encoded: bool,
+    pub encrypted: bool,
     pub content: Vec<u8>,
     pub timestamp: i64,
 }
@@ -690,7 +687,6 @@ const PRIVATE_CHAT_VERSION: [u8; 1] = [1];
 #[account]
 pub struct PrivateChat {
     pub wallets: [Pubkey; 2],
-    pub encrypted_keys: [[u8; 32]; 2],
     pub length: u32,
     pub messages: Vec<Message>,
 }

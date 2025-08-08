@@ -48,8 +48,12 @@ export const MessageSchema: Schema = {
         len: 32,
       },
     },
-    encoded: "u8",
-    content: "string",
+    encrypted: "u8",
+    content: {
+      array: {
+        type: "u8",
+      },
+    },
     timestamp: {
       array: {
         type: "u8",
@@ -62,7 +66,6 @@ export const MessageSchema: Schema = {
 export const ChatSchema: Schema = {
   struct: {
     wallets: { array: { type: PubkeySchema, len: 2 } },
-    encrypted_keys: { array: { type: PubkeySchema, len: 2 } },
     length: "u32",
     messages: { array: { type: MessageSchema } },
   },

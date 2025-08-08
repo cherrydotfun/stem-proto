@@ -40,6 +40,7 @@ export type Peer = {
 
 export type PeerAccount = {
   account: Account | null;
+  peer: Descriptor,
   status: PeerStatus;
 };
 export type GroupAccount = {
@@ -59,7 +60,9 @@ export type ChatMetadata = Record<string, {
 
 
 export type Descriptor = {
+  pubkey: Uint8Array;
   peers: Peer[];
+  groups: Peer[];
 };
 
 export type PeerBorsh = {

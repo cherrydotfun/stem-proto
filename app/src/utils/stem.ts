@@ -20,7 +20,7 @@ import { EventEmitter } from "./events";
 
 import { Account, Connection } from "./solana";
 import { ChatSchema, DescriptorSchema, GroupDescriptorSchema } from "./schemas";
-import type { DescriptorBorsh, ChatBorsh, GroupDescriptorBorsh, ChatListItem, ChatMetadata, ChatMap, GroupMap } from "./types";
+import type { DescriptorBorsh, ChatBorsh, GroupDescriptorBorsh, ChatListItem, ChatMetadata, ChatMap, GroupMap, Descriptor } from "./types";
 import { GroupPeerStatus, PeerStatus } from "./types";
 
 import { PROGRAM_ID, SEED_DESCRIPTOR, SEED_PRIVATE_CHAT, SEED_GROUP_DESCRIPTOR, WALLET_DESCRIPTOR_VERSION, PRIVATE_CHAT_VERSION } from "./const";
@@ -215,6 +215,19 @@ export class Stem {
     this._x25519Public = x25519Public;
   }
 
+  setKeypair(x25519Private: Uint8Array, x25519Public: Uint8Array) {
+    this._x25519Private = x25519Private;
+    this._x25519Public = x25519Public;
+  }
+
+  // todo: remove this, test only
+  getX25519Private() {
+    return this._x25519Private;
+  }
+  getX25519Public() {
+    return this._x25519Public;
+  }
+
   async _parseAndUpdatePeers() {
     console.log("Stem._parseAndUpdatePeers()");
 
@@ -257,6 +270,13 @@ export class Stem {
             this._connection.connection,
             this._subscribe
           );
+          const peerDescriptor = new Account(
+            await helpers.getDescriptorPda(peerPubKey),
+            this._connection.connection,
+            this._subscribe
+          );
+          await peerDescriptor.fetch();
+
           if (this._subscribe) {
             account.onUpdate(() => {
               console.log("STEM: Chat updated", account.publicKey.toBase58());
@@ -270,6 +290,10 @@ export class Stem {
           account.fetch();
           this._chatsAccounts.set(peerPubKeyString, {
             account,
+            peer: borsh.deserialize(
+              DescriptorSchema,
+              peerDescriptor.data.subarray(8)
+            ) as Descriptor,
             status: peer.status,
           });
 
@@ -277,6 +301,7 @@ export class Stem {
         } else if (peer.status !== obj?.status) {
           this._chatsAccounts.set(peerPubKeyString, {
             account: obj?.account!,
+            peer: obj?.peer!,
             status: peer.status,
           });
           chatListUpdated = true;
@@ -634,8 +659,15 @@ export class Stem {
 
     const hash = await helpers.getChatHash(this._publicKey, invitee);
 
+    const peerDescriptor = new Account(inviteePda, this._connection.connection, false);
+    await peerDescriptor.fetch();
+    const peerDescriptorData = borsh.deserialize(
+      DescriptorSchema,
+      peerDescriptor.data.subarray(8)
+    ) as Descriptor;
+
     // derive shared secret
-    const shared = nacl.scalarMult(this._x25519Private, invitee._x25519Public);
+    const shared = nacl.scalarMult(this._x25519Private, Uint8Array.from(peerDescriptorData.pubkey));
 
     const key = helpers.hkdf32(shared, 'CherryFun:V1:salt', 'Stem-proto-KEK-v1');
 
@@ -647,8 +679,8 @@ export class Stem {
 
     const encryptedMessageBuffer = wordArrayToU8(encryptedMessage.ciphertext);
 
-    console.log('Message', message);
-    console.log('encryptedMessageBuffer', encryptedMessageBuffer);
+    console.log('Message', message, message.length);
+    console.log('encryptedMessageBuffer', encryptedMessageBuffer, Buffer.from(encryptedMessageBuffer).toString());
 
     const ix = new TransactionInstruction({
       programId: PROGRAM_ID,
@@ -687,10 +719,19 @@ export class Stem {
       data: Buffer.concat([
         await helpers.getdisc("invite"),
         hash,
+        numToBuffer_8(1),
         numToBuffer_32(encryptedMessageBuffer.length),
         encryptedMessageBuffer,
       ]),
     });
+
+    console.log(Buffer.concat([
+      await helpers.getdisc("invite"),
+      hash,
+      numToBuffer_8(1),
+      numToBuffer_32(encryptedMessageBuffer.length),
+      encryptedMessageBuffer,
+    ]));
 
     const blockhash = await this._connection.getLatestBlockhash();
 
