@@ -65,6 +65,7 @@
         v-for="peer in invitedPeers"
         :key="peer.pubkey?.toBase58()"
         class="invite-item"
+        @click="printChat(peer.pubkey)"
       >
         <AvatarComponent :userKey="peer.pubkey?.toBase58() || ''" />
         <div class="peer-info">
@@ -125,6 +126,7 @@
     (e: "rejectPeer", peer: PublicKey): void;
     (e: "createGroup"): void;
     (e: "printGroups"): void;
+    (e: "printChat", peer: PublicKey): void;
   }>();
 
   // const publicKey = computed(() => new PublicKey(props.userKey));
@@ -175,6 +177,11 @@
 
   const printGroups = () => {
     emit("printGroups");
+  }
+
+  const printChat = (peer: PublicKey | null) => {
+    if (!peer) return;
+    emit("printChat", peer);
   }
 </script>
 

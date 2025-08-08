@@ -109,6 +109,7 @@ export type ChatList =ChatListItem[];
 
 export type MessageBorsh = {
   readonly sender: Uint8Array;
+  readonly encrypted: boolean;
   readonly content: Uint8Array;
   readonly timestamp: Uint8Array;
 };

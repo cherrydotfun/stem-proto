@@ -72,6 +72,7 @@
             @rejectPeer="rejectPeer"
             @createGroup="createGroup"
             @printGroups="printGroups"
+            @printChat="printChat"
           />
         </div>
       </div>
@@ -156,6 +157,8 @@
   import MenuComponent from "../components/MenuComponent.vue";
   import Chat from "../components/chat.vue";  
   import { copyKey } from "../utils/helpers";
+import { set } from "@coral-xyz/anchor/dist/cjs/utils/features";
+import { Stem } from "../utils";
 
   const props = defineProps<{
     publicKey: PublicKey | null;
@@ -299,6 +302,13 @@ Talk deal flow, alpha, governance moves — no shill, no spam, no noise. Access 
     // const signatureObject = await props.wallet.signTransaction(tx);
     // await signatureObject.confirm("finalized");
     // console.log("Create group TX sent");
+  }
+
+  const printChat = (peer: PublicKey) => {
+    console.log("printChat called with peer:", peer.toBase58());
+    // chatPeer.value = peer;
+    const chat = props.stem.raw.getChat(peer);
+    console.log("chat", chat);
   }
 </script>
 

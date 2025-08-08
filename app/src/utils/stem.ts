@@ -46,6 +46,13 @@ function wordArrayToU8(wa: CryptoJS.lib.WordArray) {
   }
   return u8;
 }
+function u8ToWordArray(u8: Uint8Array) {
+  const words = [];
+  for (let i = 0; i < u8.length; i += 4) {
+    words.push(((u8[i] << 24) | (u8[i + 1] << 16) | (u8[i + 2] << 8) | (u8[i + 3] || 0)) >>> 0);
+  }
+  return CryptoJS.lib.WordArray.create(words, u8.length);
+}
 
 const numToBuffer_64 = (num: number) => {
   const buf = Buffer.alloc(8);
@@ -282,7 +289,7 @@ export class Stem {
               console.log("STEM: Chat updated", account.publicKey.toBase58());
               this._emitter.emit("onChatUpdated", {
                 pubkey: peerPubKey,
-                chat: this._parseChat(account),
+                chat: this._parseChat(account, new Uint8Array([0])), // ??????
               });
             });
           }
@@ -425,20 +432,31 @@ export class Stem {
     });
   }
 
-  _parseChat(account: Account) {
+  _parseChat(account: Account, key: Uint8Array) {
     const chat = borsh.deserialize(
       ChatSchema,
       account.data.subarray(8)
     ) as ChatBorsh;
     // debugger;
+
+    function decryptMessage(message: Uint8Array<ArrayBufferLike>) {
+      const decryptedMessage = CryptoJS.AES.decrypt({ciphertext: u8ToWordArray(message)} as any, CryptoJS.lib.WordArray.create(key), {
+        iv: CryptoJS.lib.WordArray.create(new Uint8Array(16)),
+        mode: CryptoJS.mode.CTR,
+        padding: CryptoJS.pad.NoPadding
+      });
+      return decryptedMessage.toString(CryptoJS.enc.Utf8);
+    }
+
     return {
       wallets: chat.wallets.map((wallet) => new PublicKey(wallet)),
       length: chat.length,
       messages: chat.messages.map((message, index) => ({
         id:  _getHash(Buffer.concat([Buffer.from(message.sender), Buffer.from(message.content), Buffer.from(message.timestamp)])),
         index,
+        encrypted: message.encrypted,
         sender: new PublicKey(message.sender),
-        content: Buffer.from(message.content).toString(),
+        content: decryptMessage(message.content),
         timestamp: new Date(
           Buffer.from(message.timestamp.slice(0, 4)).readUint32LE() * 1000
         ),
@@ -479,6 +497,9 @@ export class Stem {
     if (!this._isRegistered) {
       throw Error("Account is not registered");
     }
+    if (!this._x25519Private || !this._x25519Public) {
+      throw new Error("X25519 keys not generated");
+    }
 
     const peerAccount = this._chatsAccounts.get(pubkey.toBase58());
 
@@ -488,8 +509,14 @@ export class Stem {
     if (!peerAccount) {
       return null;
     }
+    const peerDescriptorData = peerAccount.peer;
 
-    return peerAccount?.account ? this._parseChat(peerAccount.account) : null;
+    // derive shared secret
+    const shared = nacl.scalarMult(this._x25519Private, Uint8Array.from(peerDescriptorData.pubkey));
+
+    const key = helpers.hkdf32(shared, 'CherryFun:V1:salt', 'Stem-proto-KEK-v1');
+
+    return peerAccount?.account ? this._parseChat(peerAccount.account, key) : null;
   }
 
   getGroup(pubkey: PublicKey) {
