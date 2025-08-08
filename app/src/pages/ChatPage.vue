@@ -198,9 +198,10 @@
     const inviteePubkey = new PublicKey(invitee);
     if (props.wallet.publicKey && inviteePubkey && props.stem.raw) {
       const tx = await props.stem.raw.createInviteTx(inviteePubkey, "Hello, I'm inviting you to chat with me");
-      const signatureObject = await props.wallet.signTransaction(tx);
-      await signatureObject.confirm("finalized");
-      console.log("Invite TX sent");
+      console.log('tx', tx);
+      // const signatureObject = await props.wallet.signTransaction(tx);
+      // await signatureObject.confirm("finalized");
+      // console.log("Invite TX sent");
     }
   };
 

@@ -83,7 +83,8 @@
         placeholder="Enter public key"
         class="invite-input"
       />
-      <!-- <button @click="invite" class="invite-button">Invite</button>
+      <button @click="invite" class="invite-button">Invite</button>
+      <!-- 
       <button @click="createGroup" class="invite-button">Create GROUP</button>
       <button @click="printGroups" class="invite-button">Print Groups</button> -->
     </div>

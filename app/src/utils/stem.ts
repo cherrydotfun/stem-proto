@@ -38,6 +38,15 @@ const getHash = (data: Buffer | string) => {
   return Buffer.from(_getHash(data), 'hex');
 };
 
+function wordArrayToU8(wa: CryptoJS.lib.WordArray) {
+  const { words, sigBytes } = wa;
+  const u8 = new Uint8Array(sigBytes);
+  for (let i = 0; i < sigBytes; i++) {
+    u8[i] = (words[i >>> 2] >>> (24 - (i % 4) * 8)) & 0xff;
+  }
+  return u8;
+}
+
 const numToBuffer_64 = (num: number) => {
   const buf = Buffer.alloc(8);
   buf.writeUIntLE(num, 0, 8);
@@ -53,6 +62,8 @@ const numToBuffer_8 = (num: number) => {
   buf.writeUInt8(num, 0);
   return buf;
 }
+const enc = (s: string) => new TextEncoder().encode(s);
+
 
 export const helpers = {
   getdisc: async (name: string) => (await getHash(Buffer.from(`global:${name}`))).subarray(0, 8),
@@ -103,6 +114,9 @@ export const helpers = {
     const seed = hkdf(sha256, signature, salt, info, 32); // 32 bytes for X25519
   
     return seed;
+  },
+  hkdf32(input: Uint8Array, salt: string, info: string) {
+    return hkdf(sha256, input, enc(salt), enc(info), 32);
   }
 };
 
@@ -604,6 +618,10 @@ export class Stem {
       throw Error("Peer already invited");
     }
 
+    if (!this._x25519Private || !this._x25519Public) {
+      throw new Error("X25519 keys not generated");
+    }
+
     const inviterPda = await helpers.getDescriptorPda(this._publicKey);
     const inviteePda = await helpers.getDescriptorPda(invitee);
 
@@ -615,6 +633,22 @@ export class Stem {
     }
 
     const hash = await helpers.getChatHash(this._publicKey, invitee);
+
+    // derive shared secret
+    const shared = nacl.scalarMult(this._x25519Private, invitee._x25519Public);
+
+    const key = helpers.hkdf32(shared, 'CherryFun:V1:salt', 'Stem-proto-KEK-v1');
+
+    const encryptedMessage = CryptoJS.AES.encrypt(CryptoJS.lib.WordArray.create(Buffer.from(message)), CryptoJS.lib.WordArray.create(key), {
+      iv: CryptoJS.lib.WordArray.create(new Uint8Array(16)),
+      mode: CryptoJS.mode.CTR,
+      padding: CryptoJS.pad.NoPadding
+    });
+
+    const encryptedMessageBuffer = wordArrayToU8(encryptedMessage.ciphertext);
+
+    console.log('Message', message);
+    console.log('encryptedMessageBuffer', encryptedMessageBuffer);
 
     const ix = new TransactionInstruction({
       programId: PROGRAM_ID,
@@ -653,8 +687,8 @@ export class Stem {
       data: Buffer.concat([
         await helpers.getdisc("invite"),
         hash,
-        numToBuffer_32(Buffer.from(message).length),
-        Buffer.from(message),
+        numToBuffer_32(encryptedMessageBuffer.length),
+        encryptedMessageBuffer,
       ]),
     });
 
@@ -827,6 +861,8 @@ export class Stem {
 
     const buf = Buffer.alloc(4);
     buf.writeUInt32LE(Buffer.from(message).length, 0);
+
+
 
     const ix = new TransactionInstruction({
       programId: PROGRAM_ID,
