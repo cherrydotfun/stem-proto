@@ -492,7 +492,7 @@ pub struct Accept<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(_hash: [u8; 32], content: Vec<u8>)]
+#[instruction(_hash: [u8; 32], encrypted: bool, content: Vec<u8>)]
 pub struct SendMessage<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,

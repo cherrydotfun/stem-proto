@@ -36,7 +36,7 @@
       >
         <AvatarComponent :userKey="peer.pubkey?.toBase58() || ''" />
         <div class="peer-info">
-          <div class="peer-key">
+          <div class="peer-key" @click="printChat(peer.pubkey)">
             {{ peer.pubkey?.toBase58().slice(0, 4) }}...{{
               peer.pubkey?.toBase58().slice(-4)
             }}

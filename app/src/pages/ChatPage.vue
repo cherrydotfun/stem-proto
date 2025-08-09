@@ -212,7 +212,8 @@ import { Stem } from "../utils";
   const rejectPeer = async (peer: PublicKey) => {
     if (props.wallet.publicKey && peer && props.stem.raw) {
       const tx = await props.stem.raw.createRejectTx(peer);
-      const signatureObject = await props.wallet.signTransaction(tx);
+      const signedTx = await props.wallet.signTransaction(tx);
+      const signatureObject = await props.stem.raw.connection.sendTransaction(signedTx);
       await signatureObject.confirm("finalized");
       console.log("Reject TX sent");
     }
@@ -220,7 +221,9 @@ import { Stem } from "../utils";
   const acceptPeer = async (peer: PublicKey) => {
     if (props.wallet.publicKey && peer && props.stem.raw) {
       const tx = await props.stem.raw.createAcceptTx(peer);
-      const signatureObject = await props.wallet.signTransaction(tx);
+      // console.log('tx', tx);
+      const signedTx = await props.wallet.signTransaction(tx);
+      const signatureObject = await props.stem.raw.connection.sendTransaction(signedTx);
       await signatureObject.confirm("finalized");
       console.log("Accept TX sent");
     }
@@ -238,9 +241,12 @@ import { Stem } from "../utils";
       const tx = await props.stem.raw.createSendMessageTx(chatPeer.value, message.value);
       message.value = "";
       canSendMessage.value = false;
-      const signatureObject = await props.wallet.signTransaction(tx);
-      await signatureObject.confirm("finalized");
-      console.log("Send message TX sent");
+      const signedTx = await props.wallet.signTransaction(tx);
+      // const signatureObject = await props.stem.raw.connection.sendTransaction(signedTx);
+      // await signatureObject.confirm("finalized");
+      // console.log("Send message TX sent");
+      const st =   await props.stem.raw.connection._connection.simulateTransaction(signedTx);
+      console.log("st", st);
       canSendMessage.value = true;
     }
   };
