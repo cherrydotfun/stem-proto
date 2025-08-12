@@ -32,20 +32,21 @@ export const usePhantomWallet = (rpcUrl: string = "http://localhost:8899") => {
     }
     console.log("Signing transaction", publicKey.value.toBase58());
 
-    const {
-      context: { slot: minContextSlot },
-    } = await connection.getLatestBlockhashAndContext();
-
-    const signature = await wallet.sendTransaction(tx, connection, {
-      minContextSlot,
-    });
+    const signature = await wallet.signTransaction(tx);
     // await connection.confirmTransaction({
     //   blockhash,
     //   lastValidBlockHeight,
     //   signature,
     // });
-    return new Signature(signature, connection);
+    return signature;
   };
 
-  return { name, installed, publicKey, connect, connected, signTransaction };
+  const signMessage = async (message: string) => {
+    if (!publicKey.value) {
+      throw new Error("Keypair not found");
+    }
+    return await wallet.signMessage(new TextEncoder().encode(message));
+  };
+
+  return { name, installed, publicKey, connect, connected, signTransaction, signMessage };
 };

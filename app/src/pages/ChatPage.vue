@@ -70,6 +70,10 @@
             @invite="invite"
             @acceptPeer="acceptPeer"
             @rejectPeer="rejectPeer"
+            @createGroup="createGroup"
+            @printGroups="printGroups"
+            @printChat="printChat"
+            @joinGroup="joinGroup"
           />
         </div>
       </div>
@@ -195,8 +199,10 @@
   const invite = async (invitee: string) => {
     const inviteePubkey = new PublicKey(invitee);
     if (props.wallet.publicKey && inviteePubkey && props.stem.raw) {
-      const tx = await props.stem.raw.createInviteTx(inviteePubkey);
-      const signatureObject = await props.wallet.signTransaction(tx);
+      const tx = await props.stem.raw.createInviteTx(inviteePubkey, "Hello, I'm inviting you to chat with me");
+      // console.log('tx', tx);
+      const signedTx = await props.wallet.signTransaction(tx);
+      const signatureObject = await props.stem.raw.connection.sendTransaction(signedTx);
       await signatureObject.confirm("finalized");
       console.log("Invite TX sent");
     }
@@ -205,7 +211,8 @@
   const rejectPeer = async (peer: PublicKey) => {
     if (props.wallet.publicKey && peer && props.stem.raw) {
       const tx = await props.stem.raw.createRejectTx(peer);
-      const signatureObject = await props.wallet.signTransaction(tx);
+      const signedTx = await props.wallet.signTransaction(tx);
+      const signatureObject = await props.stem.raw.connection.sendTransaction(signedTx);
       await signatureObject.confirm("finalized");
       console.log("Reject TX sent");
     }
@@ -213,7 +220,9 @@
   const acceptPeer = async (peer: PublicKey) => {
     if (props.wallet.publicKey && peer && props.stem.raw) {
       const tx = await props.stem.raw.createAcceptTx(peer);
-      const signatureObject = await props.wallet.signTransaction(tx);
+      // console.log('tx', tx);
+      const signedTx = await props.wallet.signTransaction(tx);
+      const signatureObject = await props.stem.raw.connection.sendTransaction(signedTx);
       await signatureObject.confirm("finalized");
       console.log("Accept TX sent");
     }
@@ -231,9 +240,12 @@
       const tx = await props.stem.raw.createSendMessageTx(chatPeer.value, message.value);
       message.value = "";
       canSendMessage.value = false;
-      const signatureObject = await props.wallet.signTransaction(tx);
-      await signatureObject.confirm("finalized");
-      console.log("Send message TX sent");
+      const signedTx = await props.wallet.signTransaction(tx);
+      // const signatureObject = await props.stem.raw.connection.sendTransaction(signedTx);
+      // await signatureObject.confirm("finalized");
+      // console.log("Send message TX sent");
+      const st =   await props.stem.raw.connection._connection.simulateTransaction(signedTx);
+      console.log("st", st);
       canSendMessage.value = true;
     }
   };
@@ -259,6 +271,68 @@
   onUnmounted(() => {
     window.removeEventListener('resize', setVh);
   });
+
+  const gTitle = "TMP GROUP";
+  const gDescription = `Public chat for all Cherry users.`;
+  const gImage = "https://pbs.twimg.com/profile_images/1936763131029520384/IbA2iXyx_400x400.jpg";
+  // const gTitle = "Cherry lovers";
+  // const gDescription = `Public chat for all Cherry users.`;
+  // const gImage = "https://pbs.twimg.com/profile_images/1936763131029520384/IbA2iXyx_400x400.jpg";
+//   const gTitle = "Seeker Club";
+//   const gDescription = `Private chat for Seeker holders. Based & Solana-pilled.
+
+// This is where Seeker owners share feedback, trade ideas, test apps, and shape the future of onchain UX. Gated by Seeker NFT. Direct line to builders shipping for Solana Mobile.
+
+// 🧪 Early access to drops, demos & alpha.`;
+//   const gImage = "https://fq4psd3o7flgmgcbyl6krqrddvw6qnjpcrdi2domtqyxhwerpjnq.arweave.net/LDj5D275VmYYQcL8qMIjHW3oNS8URo0NzJwxc9iRels";
+//   const gTitle = "💰7-Figure Club";
+//   const gDescription = `Private club for wallets holding $1M+ on Solana.
+
+// Talk deal flow, alpha, governance moves — no shill, no spam, no noise. Access is wallet-gated. Net worth verified on-chain.`;
+//   const gImage = "https://wjxeux2535cdkqdxi7m2nqbtv26dx26jw63qorboraainslerr5a.arweave.net/sm5KX13fRDVAd0fZpsAzrrw768m3twdELogAhslkjHo";
+
+  const createGroup = async () => {
+    console.log("createGroup called");
+    const tx = await props.stem.raw.createCreateGroupTx(1, gTitle, gDescription, gImage);
+    console.log("tx", tx);
+    const signedTx = await props.wallet.signTransaction(tx);
+
+    const signatureObject = await props.stem.raw.connection.sendTransaction(signedTx);
+    await signatureObject.confirm("finalized");
+    console.log("Create group TX sent", signatureObject);
+  }
+  const joinGroup = async () => {
+    console.log("createGroup called");
+    const tx = await props.stem.raw.createJoinGroupTx(new PublicKey("66X8SyeLkGAfPsgHRHTb88UpkFi1vvnLvtVZ7PtWGe4j"));
+    console.log("tx", tx);
+    const signedTx = await props.wallet.signTransaction(tx);
+
+    const signatureObject = await props.stem.raw.connection.sendTransaction(signedTx);
+    await signatureObject.confirm("finalized");
+    console.log("Create group TX sent", signatureObject);
+  }
+
+  const printGroups = async () => {
+    console.log("printGroups called");
+    for (const group of props.stem.raw.groups) {
+      console.log("group", group.account.toBase58());
+    }
+    console.log("groups", props.stem.raw.groups);
+
+    // console.log("createGroup called");
+    // const tx = await props.stem.raw.createSendMessageToGroupTx(props.stem.raw.groups[0].account, "The first rule of being a cat lover is to tell everyone you love cats.");
+    // console.log("tx", tx);
+    // const signatureObject = await props.wallet.signTransaction(tx);
+    // await signatureObject.confirm("finalized");
+    // console.log("Create group TX sent");
+  }
+
+  const printChat = (peer: PublicKey) => {
+    console.log("printChat called with peer:", peer.toBase58());
+    // chatPeer.value = peer;
+    const chat = props.stem.raw.getChat(peer);
+    console.log("chat", chat);
+  }
 </script>
 
 <style scoped>

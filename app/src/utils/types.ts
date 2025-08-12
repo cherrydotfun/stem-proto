@@ -1,5 +1,7 @@
 import { PublicKey } from "@solana/web3.js";
 
+import { Account } from "./solana";
+
 /**
  * for inviter:
  *            Accepted
@@ -36,8 +38,31 @@ export type Peer = {
   status: PeerStatus;
 };
 
+export type PeerAccount = {
+  account: Account | null;
+  peer: Descriptor,
+  status: PeerStatus;
+};
+export type GroupAccount = {
+  account: Account | null;
+  state: GroupPeerStatus;
+};
+
+export type ChatMap = Map<string, PeerAccount>;
+export type GroupMap = Map<string, GroupAccount>;
+
+export type ChatMetadata = Record<string, {
+  lastMessage: string;
+  timestamp: string;
+  lastMessageSender: string;
+  lastMessageId: string;
+}>;
+
+
 export type Descriptor = {
+  pubkey: Uint8Array;
   peers: Peer[];
+  groups: Peer[];
 };
 
 export type PeerBorsh = {
@@ -51,11 +76,14 @@ export type GroupBorsh = {
 };
 
 export type DescriptorBorsh = {
+  pubkey: Uint8Array;
   peers: PeerBorsh[];
   groups: GroupBorsh[];
 };
 
 export type Message = {
+  readonly id: string;
+  readonly index: number;
   readonly sender: PublicKey;
   readonly content: string;
   readonly timestamp: Date;
@@ -72,14 +100,16 @@ export type ChatListItem = {
   pubkey: PublicKey;
   status: PeerStatus | undefined;
   lastMessage: string | undefined;
-  timestamp: Date | undefined;
+  lastMessageId: string;
+  timestamp: string | undefined;
   lastMessageSender: string | undefined;
-}[]
+};
 
 export type ChatList =ChatListItem[];
 
 export type MessageBorsh = {
   readonly sender: Uint8Array;
+  readonly encrypted: boolean;
   readonly content: Uint8Array;
   readonly timestamp: Uint8Array;
 };

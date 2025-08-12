@@ -48,11 +48,17 @@ export const useAccount = (
     raw: null as Account | null,
   });
 
-  watchEffect(() => {
+  watchEffect(async () => {
     console.log("Composable Account watchEffect", publicKey.value);
     if (publicKey.value) {
-      account = connection.getAccount(publicKey.value, true);
+      account = await connection.getAccount(publicKey.value, true);
       retData.raw = account;
+      console.log("Composable Account account", account);
+      retData.lamports = account.lamports;
+      retData.balance = account.balance;
+      retData.data = new Uint8Array(account.data);
+      retData.isInitialized = account.isInitialized;
+
       account.onUpdate((account) => {
         console.log("Composable Account updated", account);
         retData.lamports = account.lamports;

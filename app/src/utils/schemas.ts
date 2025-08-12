@@ -29,6 +29,12 @@ export const GroupSchema: Schema = {
 
 export const DescriptorSchema: Schema = {
   struct: {
+    pubkey: {
+      array: {
+        type: "u8",
+        len: 32,
+      },
+    },
     peers: { array: { type: PeerSchema } },
     groups: { array: { type: GroupSchema } },
   },
@@ -42,7 +48,12 @@ export const MessageSchema: Schema = {
         len: 32,
       },
     },
-    content: "string",
+    encrypted: "u8",
+    content: {
+      array: {
+        type: "u8",
+      },
+    },
     timestamp: {
       array: {
         type: "u8",

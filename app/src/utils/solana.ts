@@ -49,7 +49,7 @@ export class Account {
       this._emitter = new EventEmitter();
       this._connection?.onAccountChange(this._publicKey, (accountInfo) => {
         this._update(accountInfo);
-        console.log("SOLANA: Account updated", accountInfo);
+        console.log("SOLANA: Account updated", this._publicKey.toString());
         this._emitter?.emit("update", this);
       });
     }
@@ -193,7 +193,7 @@ export class Signature {
   private _isInitialized: boolean;
 
   constructor(signature: string, connection: Web3Connection) {
-    console.log("SOLANA: Signature constructor", signature, connection);
+    // console.log("SOLANA: Signature constructor", signature, connection);
 
     this._signature = signature;
     this._connection = connection;
@@ -266,7 +266,7 @@ export class Signature {
       }
       const updateListener = (signature: Signature) => {
         if (signature.confirmationStatus === commitment) {
-          resolve(signature);
+        resolve(signature);
           this._emitter?.off("update", updateListener);
         }
         if (signature.err) {
@@ -276,6 +276,15 @@ export class Signature {
       };
       this._emitter?.on("update", updateListener);
 
+      // const _interval = setInterval(async () => {
+      //   await this.fetch();
+      //   if (this._confirmationStatus === commitment) {
+      //     clearInterval(_interval);
+      //     resolve(this);
+      //     this._emitter?.off("update", updateListener);
+      //   }
+      //   // this._emitter?.emit("update", this);
+      // }, 2000);
       this._connection.onSignature(
         this._signature,
         async () => {
@@ -284,6 +293,7 @@ export class Signature {
         },
         commitment
       );
+
     });
   }
 }
