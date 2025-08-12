@@ -34,6 +34,16 @@ export const useStem = (
     }
 
     stem = new Stem(publicKey.value, connection, true);
+    const keysData = localStorage.getItem("x25519Keys");
+    if (keysData) {
+      const keys = JSON.parse(keysData);
+      stem.setKeypair(Uint8Array.from(Buffer.from(keys.x25519Private, "base64")), Uint8Array.from(Buffer.from(keys.x25519Public, "base64")));
+      console.log("Keys loaded from local storage", stem.getX25519Private(), stem.getX25519Public());
+    } else {
+      console.log("No keys found");
+    }
+
+
     stem.on("onChatsUpdated", () => {
       retData.chats = stem?.chats;
     });

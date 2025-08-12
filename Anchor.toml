@@ -6,13 +6,13 @@ resolution = true
 skip-lint = false
 
 [programs.localnet]
-cherry_chat = "BjheWDpSQGu1VmY1MHQPzvyBZDWvAnfrnw55mHr33BRB"
+cherry_chat = "7NLjSsfL7Hd3zauabU9EQEpT48wHnkrkZ1LJmJKdbqf"
 
 [registry]
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "localnet"
+cluster = "devnet"
 wallet = "~/.config/solana/id.json"
 
 [scripts]

@@ -1,5 +1,6 @@
-import { Connection, Keypair, PublicKey, Transaction } from "@solana/web3.js";
+import { Connection, Keypair, PublicKey, Transaction, VersionedTransaction } from "@solana/web3.js";
 import { ref } from "vue";
+import nacl from 'tweetnacl';
 import { Signature } from "../utils/solana";
 
 export const useLocalWallet = (rpcUrl: string = "http://localhost:8899") => {
@@ -49,16 +50,32 @@ export const useLocalWallet = (rpcUrl: string = "http://localhost:8899") => {
     connected.value = true;
   };
 
-  const signTransaction = async (tx: Transaction) => {
+  // const signTransaction = async (tx: Transaction) => {
+  //   if (!keypair.value) {
+  //     throw new Error("Keypair not found");
+  //   }
+  //   console.log("Signing transaction", keypair.value.publicKey.toBase58());
+
+  //   const signature = await connection.sendTransaction(tx, [keypair.value]);
+  //   console.log("Transaction sent", signature);
+  //   return new Signature(signature, connection);
+  // };
+
+  const signTransaction = async (tx: VersionedTransaction) => {
     if (!keypair.value) {
       throw new Error("Keypair not found");
     }
-    console.log("Signing transaction", keypair.value.publicKey.toBase58());
 
-    const signature = await connection.sendTransaction(tx, [keypair.value]);
-    console.log("Transaction sent", signature);
-    return new Signature(signature, connection);
+    tx.sign([keypair.value]);
+    return tx;
   };
 
-  return { name, installed, publicKey, connect, connected, signTransaction };
+  const signMessage = async (message: string) => {
+    if (!keypair.value) {
+      throw new Error("Keypair not found");
+    }
+    return await nacl.sign.detached(new TextEncoder().encode(message), keypair.value.secretKey);
+  };
+
+  return { name, installed, publicKey, connect, connected, signTransaction, signMessage };
 };
