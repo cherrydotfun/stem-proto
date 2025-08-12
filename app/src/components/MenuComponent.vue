@@ -85,9 +85,10 @@
         class="invite-input"
       />
       <button @click="invite" class="invite-button">Invite</button>
-      <!-- 
-      <button @click="createGroup" class="invite-button">Create GROUP</button>
-      <button @click="printGroups" class="invite-button">Print Groups</button> -->
+      
+      <!-- <button @click="createGroup" class="invite-button">Create GROUP</button>
+      <button @click="printGroups" class="invite-button">Print Groups</button>
+      <button @click="joinGroup" class="invite-button">Join Group</button> -->
     </div>
   </div>
 </template>
@@ -127,6 +128,7 @@
     (e: "createGroup"): void;
     (e: "printGroups"): void;
     (e: "printChat", peer: PublicKey): void;
+    (e: "joinGroup"): void;
   }>();
 
   // const publicKey = computed(() => new PublicKey(props.userKey));
@@ -182,6 +184,10 @@
   const printChat = (peer: PublicKey | null) => {
     if (!peer) return;
     emit("printChat", peer);
+  }
+
+  const joinGroup = () => {
+    emit("joinGroup");
   }
 </script>
 

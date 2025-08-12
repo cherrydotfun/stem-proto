@@ -512,7 +512,7 @@ pub struct SendMessage<'info> {
 pub struct CreateGroup<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
-    #[account(mut, seeds = [b"wallet_descriptor", payer.key().as_ref(), WALLET_DESCRIPTOR_VERSION.as_ref()], bump, realloc = 8 + 4 + (payer_descriptor.peers.len())*(32 + 1) + 4 + (payer_descriptor.groups.len() + 1) * ( 32 +1 ), realloc::payer = payer, realloc::zero = true)]
+    #[account(mut, seeds = [b"wallet_descriptor", payer.key().as_ref(), WALLET_DESCRIPTOR_VERSION.as_ref()], bump, realloc = 8 + 32 + 4 + (payer_descriptor.peers.len())*(32 + 1) + 4 + (payer_descriptor.groups.len() + 1) * ( 32 +1 ), realloc::payer = payer, realloc::zero = true)]
     pub payer_descriptor: Account<'info, WalletDescriptor>,
     #[account(init, 
         payer = payer, 
@@ -623,6 +623,7 @@ pub struct JoinGroup<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
     #[account(mut, seeds = [b"wallet_descriptor", payer.key().as_ref(), WALLET_DESCRIPTOR_VERSION.as_ref()], bump, realloc = 8 // discriminator
+        + 32 
         + 4 + (payer_descriptor.peers.len())*(32 + 1 ) 
         + 4 + (payer_descriptor.groups.len() + 1) * ( 32 + 1 )
     , realloc::payer = payer, realloc::zero = true)]
