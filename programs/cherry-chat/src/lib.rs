@@ -325,7 +325,7 @@ pub mod cherry_chat {
             timestamp: current_timestamp,
         });
 
-        let message_length = 32 + 4 + group_descriptor.messages.last().unwrap().content.len() as u32 + 8;
+        let message_length = 32 + 4 + 1 + group_descriptor.messages.last().unwrap().content.len() as u32 + 8;
         group_descriptor.length += message_length;
 
         // Get all active group members for notifications (exclude sender)
